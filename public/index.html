@@ -66,7 +66,7 @@ $('re').onclick=load;$('days').onchange=load;$('q').oninput=()=>data&&render();
 function md(t){const e=esc(t).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');let o='',ul=false;
  for(const l of e.split(/\r?\n/)){if(/^\s*[-*] /.test(l)){if(!ul){o+='<ul>';ul=true}o+='<li>'+l.replace(/^\s*[-*] /,'')+'</li>'}
  else{if(ul){o+='</ul>';ul=false}if(l.trim())o+='<p>'+l+'</p>'}}return o+(ul?'</ul>':'')}
-$('sumbtn').onclick=async()=>{const b=$('sumbtn');b.disabled=true;$('sumbody').textContent='AI가 요약하는 중… (10~30초)';
+$('sumbtn').onclick=async()=>{const b=$('sumbtn');b.disabled=true;$('sumbody').textContent='AI가 요약하는 중… (최대 1분)';
  try{const r=await (await fetch('/api/summary?days=7')).json();
   $('sumbody').innerHTML=r.error?`<div class="err">${esc(r.error)}</div>`:md(r.summary)+`<div class="sub">${r.generated} 생성 · 기사 ${r.count}건 → ${r.groups}개 묶음 기준</div>`;
  }catch(e){$('sumbody').textContent='요약 실패: '+e}b.disabled=false;b.textContent='다시 요약'};
