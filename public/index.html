@@ -250,7 +250,7 @@ let loadSeq=0,offline=false;
 async function load(){
  const my=++loadSeq;$('meta').textContent='불러오는 중…';$('re').disabled=true;
  const base='/api/news?days='+$('days').value+'&kw='+encodeURIComponent(kws.join(','));
- const apply=d=>{data=d;$('errs').innerHTML=d.errors.length?`<div class="note">⚠ 일부 출처 응답이 느립니다: ${d.errors.map(e=>esc(e.split(':')[0])).join(', ')} — 잠시 후 <b>새로고침</b>하면 보완됩니다.</div>`:'';
+ const apply=d=>{data=d;/* 일부 출처의 일시적 지연 안내는 화면에 표시하지 않는다(나머지 기사는 그대로 보인다) */
   active=new Set([...active].filter(k=>d.keywords.includes(k)));applyAuthors();chips();render()};
  try{
   /* 1단계: 구글 뉴스만 먼저 표시, 2단계: 지역 신문까지 합쳐서 갱신 */
