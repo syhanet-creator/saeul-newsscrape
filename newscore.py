@@ -1,10 +1,11 @@
-"""뉴스 수집(구글 뉴스 RSS + 울산뉴스넷 + 울주신문) + 스팸 제외 + 유사 기사 묶기 + 주간 AI 요약.
+"""뉴스 수집(구글 뉴스 RSS + 울산 지역 신문 8곳) + 스팸 제외 + 유사 기사 묶기 + 주간 AI 요약.
 Vercel 함수와 로컬 서버가 함께 쓴다.
 """
 import html
 import json
 import os
 import re
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -104,33 +105,132 @@ def fetch_ucinews(kw, days):
     return items
 
 
+_iusm = {"t": 0, "items": []}
+
+
+def _iusm_feed():
+    """울산매일 전체기사 RSS 는 2분간 한 번만 받아 키워드별 호출이 같이 쓴다."""
+    if time.time() - _iusm["t"] > 120:
+        req = urllib.request.Request("https://www.iusm.co.kr/rss/allArticle.xml", headers={"User-Agent": UA})
+        with urllib.request.urlopen(req, timeout=15) as r:
+            root = ET.fromstring(r.read())
+        items = []
+        for it in root.iter("item"):
+            try:
+                ts = datetime.strptime(it.findtext("pubDate").strip(), "%Y-%m-%d %H:%M:%S").replace(tzinfo=KST).timestamp()
+            except Exception:
+                continue
+            items.append({"title": (it.findtext("title") or "").strip(), "desc": it.findtext("description") or "",
+                          "link": (it.findtext("link") or "").strip(), "ts": ts})
+        _iusm.update(t=time.time(), items=items)
+    return _iusm["items"]
+
+
 def fetch_iusm(kw, days):
     """울산매일: 사이트 검색이 동작하지 않아 전체기사 RSS(최근 50건)에서 키워드가 든 기사만 고른다."""
-    req = urllib.request.Request("https://www.iusm.co.kr/rss/allArticle.xml", headers={"User-Agent": UA})
-    with urllib.request.urlopen(req, timeout=15) as r:
-        root = ET.fromstring(r.read())
     limit = time.time() - days * 86400
+    return [{"title": html.unescape(a["title"]), "link": a["link"], "source": "울산매일", "ts": a["ts"], "local": True}
+            for a in _iusm_feed() if a["ts"] >= limit and (kw in a["title"] or kw in a["desc"])]
+
+
+ART_A = re.compile(r'<a\s[^>]*href=["\']([^"\']*(?:idxno=\d+|ncode=\d+|/news/view\.php\?[^"\']*|/\d{5,})[^"\']*)["\'][^>]*>(.*?)</a>', re.S)
+DATE_RE = re.compile(r"(\d{4})[.\-](\d\d)[.\-](\d\d)(?:\s+(\d\d):(\d\d))?")
+
+
+def _art_id(href):
+    m = re.search(r"idxno=(\d+)|ncode=(\d+)|[?&](?:no|uid|id)=(\d+)|/(\d{5,})", href)
+    return next((g for g in m.groups() if g), href) if m else href
+
+
+def parse_cms_list(page, base):
+    """사이트마다 다른 검색 결과 HTML에서 (제목, 링크, 시각)을 뽑는다.
+    기사 링크 바로 뒤(다음 기사 링크 전)에 날짜가 있는 것만 채택해 사이드바 기사를 걸러낸다."""
+    anchors = [(m.start(), m.end(), m.group(1), re.sub(r"<[^>]+>", "", m.group(2)).strip()) for m in ART_A.finditer(page)]
+    found = {}
+    for i, (s, e, href, text) in enumerate(anchors):
+        aid = _art_id(href)
+        nxt = next((a[0] for a in anchors[i + 1:] if _art_id(a[2]) != aid), min(len(page), e + 900))
+        d = DATE_RE.search(page[e:min(nxt, e + 900)])
+        rec = found.setdefault(aid, {"href": href, "title": "", "date": None})
+        if len(text) >= 8 and not rec["title"]:
+            rec["title"] = html.unescape(text)
+        if d and not rec["date"]:
+            rec["date"] = d
     items = []
-    for it in root.iter("item"):
-        title = (it.findtext("title") or "").strip()
-        if kw not in title and kw not in (it.findtext("description") or ""):
+    for rec in found.values():
+        d = rec["date"]
+        if not (rec["title"] and d):
             continue
-        try:
-            ts = datetime.strptime(it.findtext("pubDate").strip(), "%Y-%m-%d %H:%M:%S").replace(tzinfo=KST).timestamp()
-        except Exception:
-            continue
-        if ts >= limit:
-            items.append({"title": html.unescape(title), "link": (it.findtext("link") or "").strip(),
-                          "source": "울산매일", "ts": ts, "local": True})
+        y, mo, da, hh, mi = d.groups()
+        ts = datetime(int(y), int(mo), int(da), int(hh or 0), int(mi or 0), tzinfo=KST).timestamp()
+        items.append({"title": rec["title"], "link": urllib.parse.urljoin(base + "/", rec["href"].replace("&amp;", "&")), "ts": ts})
     return items
 
+
+def cms_site(name, base, url, method="GET", extra=None, kwname="sc_word"):
+    """검색 결과 1페이지를 읽는 범용 수집 함수를 만든다."""
+    def fetch(kw, days):
+        params = {**(extra or {}), kwname: kw}
+        enc = urllib.parse.urlencode(params)
+        if method == "POST":
+            req = urllib.request.Request(url, data=enc.encode(), headers={"User-Agent": UA})
+        else:
+            req = urllib.request.Request(url + "?" + enc, headers={"User-Agent": UA})
+        with urllib.request.urlopen(req, timeout=15) as r:
+            raw = r.read(1_500_000)
+        try:
+            page = raw.decode("utf-8")
+        except UnicodeDecodeError:
+            page = raw.decode("euc-kr", "replace")
+        limit = time.time() - days * 86400
+        return [{**a, "source": name, "local": True} for a in parse_cms_list(page, base) if a["ts"] >= limit]
+    return fetch
+
+
+fetch_ulsanpress = cms_site("울산신문", "https://www.ulsanpress.net", "https://www.ulsanpress.net/news/articleList.html",
+                            "POST", {"sc_area": "A"})
+fetch_ksilbo = cms_site("경상일보", "https://www.ksilbo.co.kr", "https://prt.ksilbo.co.kr/engine_yonhap/search.php",
+                        "POST", {"sc_area": "A", "view_type": "sm"})
+fetch_ujeil = cms_site("울산제일일보", "http://www.ujeil.com", "http://www.ujeil.com/news/articleList.html",
+                       "GET", {"sc_area": "A"})
+fetch_ujnews = cms_site("울산종합일보", "https://www.ujnews.co.kr", "https://www.ujnews.co.kr/news/search.php",
+                        "GET", kwname="q")
 
 fetch_ulsannews = local_paper("울산뉴스넷", "http://ulsannews.net")
 fetch_uljusinmun = local_paper("울주신문", "http://www.uljusinmun.co.kr")
 
 
 SOURCES = (("google", fetch_google), ("울산뉴스넷", fetch_ulsannews),
-           ("울주신문", fetch_uljusinmun), ("울산시민신문", fetch_ucinews), ("울산매일", fetch_iusm))
+           ("울주신문", fetch_uljusinmun), ("울산시민신문", fetch_ucinews), ("울산매일", fetch_iusm),
+           ("울산신문", fetch_ulsanpress), ("경상일보", fetch_ksilbo), ("울산제일일보", fetch_ujeil),
+           ("울산종합일보", fetch_ujnews))
+
+_fcache = {}
+_locks = {name: threading.Semaphore(2) for name, _ in SOURCES}
+
+
+def _cached(name, fn, kw, days, ttl=120):
+    """같은 (출처, 키워드, 기간) 요청은 2분간 재사용해 지역 신문 사이트에 부담을 줄인다."""
+    key = (name, kw, days)
+    hit = _fcache.get(key)
+    if hit and time.time() - hit[0] < ttl:
+        return [dict(a) for a in hit[1]]
+    if name == "google":
+        res = fn(kw, days)
+    else:
+        # 지역 신문은 같은 사이트에 요청을 동시에 보내지 않고 순서대로, 429 면 잠시 후 한 번 더.
+        with _locks[name]:
+            for attempt in (0, 1):
+                try:
+                    res = fn(kw, days)
+                    break
+                except urllib.error.HTTPError as e:
+                    if e.code != 429 or attempt:
+                        raise
+                    time.sleep(1.5)
+            time.sleep(0.1)
+    _fcache[key] = (time.time(), res)
+    return [dict(a) for a in res]
 
 
 # ---------- 유사 기사 묶기 ----------
@@ -159,11 +259,13 @@ def cluster(arts):
         a["gid"] = find(i)
 
 
-def collect(days, kws=None):
+def collect(days, kws=None, fast=False):
+    """fast=True 면 구글 뉴스만(빠른 첫 화면), 아니면 지역 신문까지."""
+    sources = SOURCES[:1] if fast else SOURCES
     kws = [k for k in (kws or KEYWORDS)][:8]
-    merged, errors = {}, []
-    with ThreadPoolExecutor(max(1, len(kws) * len(SOURCES))) as ex:
-        futs = [(kw, name, ex.submit(fn, kw, days)) for kw in kws for name, fn in SOURCES]
+    merged, failed = {}, {}
+    with ThreadPoolExecutor(max(1, len(kws) * len(sources))) as ex:
+        futs = [(kw, name, ex.submit(_cached, name, fn, kw, days)) for kw in kws for name, fn in sources]
     for kw, name, f in futs:
         try:
             for a in f.result():
@@ -177,10 +279,10 @@ def collect(days, kws=None):
                     a.setdefault("local", False)
                     merged[key] = a
         except Exception as e:
-            errors.append(f"{kw} ({name}): {e}")
+            failed.setdefault(name, f"{name}: 일부 키워드 수집 실패 ({kw}: {e})")
     arts = sorted(merged.values(), key=lambda a: a["ts"], reverse=True)
     cluster(arts)
-    return {"articles": arts, "errors": errors, "keywords": kws,
+    return {"articles": arts, "errors": list(failed.values()), "keywords": kws,
             "fetched": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 
 

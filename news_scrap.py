@@ -15,7 +15,8 @@ from api._common import parse_query
 
 PORT = 8765
 INDEX = (Path(__file__).parent / "public" / "index.html").read_bytes()
-ROUTES = {"/api/news": newscore.collect, "/api/summary": newscore.weekly_summary}
+ROUTES = {"/api/news": lambda d, k, f: newscore.collect(d, k, fast=f),
+          "/api/summary": lambda d, k, f: newscore.weekly_summary(d, k)}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -25,8 +26,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         u = urllib.parse.urlparse(self.path)
         if u.path in ROUTES:
-            days, kws = parse_query(self.path)
-            body = json.dumps(ROUTES[u.path](days, kws), ensure_ascii=False).encode()
+            days, kws, fast = parse_query(self.path)
+            body = json.dumps(ROUTES[u.path](days, kws, fast), ensure_ascii=False).encode()
             ctype = "application/json; charset=utf-8"
         elif u.path == "/":
             body, ctype = INDEX, "text/html; charset=utf-8"

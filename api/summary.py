@@ -13,4 +13,4 @@ from _common import respond  # noqa: E402
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
-        respond(self, newscore.weekly_summary)
+        respond(self, lambda d, k, f: newscore.weekly_summary(d, k))

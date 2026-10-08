@@ -1,5 +1,6 @@
 <!doctype html><html lang="ko"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b5cad">
 <title>한수원 뉴스 스크랩</title>
 <style>
 :root{--bg:#f5f6f8;--card:#fff;--tx:#1b1f24;--mut:#6b7280;--ac:#0b5cad;--bd:#e3e6ea;--star:#e8a100}
@@ -31,10 +32,47 @@ label.ck{font-size:13px;color:var(--mut);display:flex;align-items:center;gap:4px
 .box>.hd{font-size:13px;color:var(--ac);font-weight:700;margin:0 4px 8px}
 .box .item{border-color:var(--bd);background:var(--bg)}
 details.kw{margin-bottom:12px;font-size:13px}details.kw summary{cursor:pointer;color:var(--mut)}
+/* ---------- 모바일 최적화 ---------- */
+html{-webkit-text-size-adjust:100%}
+body{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right);padding-bottom:env(safe-area-inset-bottom)}
+button,.star,.tab,.chip,summary,label.ck{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.scroll{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.scroll::-webkit-scrollbar{display:none}.scroll>*{flex:0 0 auto}
+.tabsbar{position:sticky;top:0;z-index:5;background:var(--bg);padding:8px 0;margin-top:0;margin-bottom:6px;border-bottom:1px solid var(--bd)}
+.item .sub{overflow-wrap:anywhere}.item a{overflow-wrap:anywhere;word-break:keep-all}
+@media(max-width:640px){
+ body{font-size:15px}
+ .wrap{padding:12px 12px 48px}
+ h1{font-size:19px}
+ .meta{font-size:12px}
+ input[type=text],select,button.act{font-size:16px;min-height:44px;padding:8px 12px}
+ .bar{gap:8px}
+ .bar>input[type=text]{flex:1 1 100%}
+ .bar>select{flex:1 1 0}.bar>#re{flex:1 1 0}
+ #scrapbar{margin-left:0!important;width:100%;display:flex;gap:8px}#scrapbar button{flex:1 1 0}
+ .tab,.chip{min-height:40px;padding:8px 14px;font-size:14px}
+ label.ck{font-size:14px;min-height:36px;gap:8px}label.ck input{width:20px;height:20px}
+ .item{padding:11px 10px;gap:6px;border-radius:10px}
+ .item a{font-size:15px;line-height:1.45}
+ .star{min-width:44px;min-height:44px;font-size:24px;margin:-8px -6px -8px -8px}
+ .sub{font-size:12px}
+ .box{padding:8px 6px 0;border-radius:10px}.box>.hd{font-size:12px;margin:0 6px 8px}
+ .sum{padding:12px}.sum h2{font-size:14px;flex-wrap:wrap}.sum .body{font-size:14px;line-height:1.55}
+ .sum summary,details.kw summary{min-height:36px;display:flex;align-items:center}
+ .tabsbar{margin-left:-12px;margin-right:-12px;padding-left:12px;padding-right:12px}
+ #chips{margin-left:-12px;margin-right:-12px;padding:0 12px 4px}
+}
+.mob{display:none}.hb{display:flex;gap:6px}
+@media(max-width:640px){
+ .mob{display:inline-block}
+ .sum.collapsed .body,.sum.collapsed label.ck,.sum.collapsed details{display:none}
+ .sum.collapsed h2{margin:0}
+}
+@media(hover:none){.item a:hover{text-decoration:none;color:var(--tx)}}
 </style></head><body><div class="wrap">
 <h1>한수원 뉴스 스크랩</h1><div class="meta" id="meta">불러오는 중…</div>
 
-<div class="sum"><h2><span>주간 AI 요약 (최근 7일)</span><button class="act" id="sumbtn">요약 생성</button></h2>
+<div class="sum"><h2><span>주간 AI 요약 · 7일</span><span class="hb"><button class="act mob" id="sumtoggle">펼치기</button><button class="act" id="sumbtn">요약 생성</button></span></h2>
 <div class="body" id="sumbody">버튼을 누르면 최근 7일 기사를 AI가 요약합니다.</div>
 <label class="ck" style="margin-top:6px"><input type="checkbox" id="autosum"> 매주 처음 열 때 자동 요약 (이 브라우저에 보관)</label>
 <details><summary>지난 요약 보기 (<span id="hn">0</span>)</summary><div id="hist"></div></details></div>
@@ -43,8 +81,8 @@ details.kw{margin-bottom:12px;font-size:13px}details.kw summary{cursor:pointer;c
 <div class="bar" style="margin-top:8px"><input type="text" id="kwin" placeholder="쉼표로 구분 (최대 8개)">
 <button class="act" id="kwok">적용</button><button class="act" id="kwreset">기본값</button></div></details>
 
-<div class="bar" id="tabs"></div>
-<div class="bar" id="chips"></div>
+<div class="bar scroll tabsbar" id="tabs"></div>
+<div class="bar scroll" id="chips"></div>
 <div class="bar"><input type="text" id="q" placeholder="결과 내 검색 (제목·언론사)">
 <select id="days"><option value="1">최근 1일</option><option value="3">최근 3일</option><option value="7" selected>최근 7일</option><option value="30">최근 30일</option></select>
 <button class="act" id="re">새로고침</button></div>
@@ -107,13 +145,21 @@ function chips(){
  $('chips').innerHTML=data.keywords.map(k=>`<button class="chip ${active.has(k)?'on':''}" data-k="${esc(k)}">${esc(k)}</button>`).join('');
  document.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{const k=b.dataset.k;active.has(k)?active.delete(k):active.add(k);chips();render()});
 }
+let loadSeq=0;
 async function load(){
- $('meta').textContent='불러오는 중…';$('re').disabled=true;
- try{data=await (await fetch('/api/news?days='+$('days').value+'&kw='+encodeURIComponent(kws.join(',')))).json();
-  $('errs').innerHTML=data.errors.map(e=>`<div class="err">${esc(e)}</div>`).join('');
-  active=new Set([...active].filter(k=>data.keywords.includes(k)));chips();render();
- }catch(e){$('meta').textContent='불러오기 실패: '+e}
- $('re').disabled=false;
+ const my=++loadSeq;$('meta').textContent='불러오는 중…';$('re').disabled=true;
+ const base='/api/news?days='+$('days').value+'&kw='+encodeURIComponent(kws.join(','));
+ const apply=d=>{data=d;$('errs').innerHTML=d.errors.map(e=>`<div class="err">${esc(e)}</div>`).join('');
+  active=new Set([...active].filter(k=>d.keywords.includes(k)));chips();render()};
+ try{
+  /* 1단계: 구글 뉴스만 먼저 표시, 2단계: 지역 신문까지 합쳐서 갱신 */
+  const first=await (await fetch(base+'&fast=1')).json();
+  if(my!==loadSeq)return;apply(first);
+  if(tab!=='scrap')$('meta').textContent+=' · 지역 신문 불러오는 중…';
+  const full=await (await fetch(base)).json();
+  if(my!==loadSeq)return;apply(full);
+ }catch(e){if(my===loadSeq)$('meta').textContent=(data?'지역 신문 불러오기 실패: ':'불러오기 실패: ')+e}
+ if(my===loadSeq)$('re').disabled=false;
 }
 
 /* ---------- 스크랩 내보내기 ---------- */
@@ -152,6 +198,11 @@ async function summarize(auto){
  }catch(e){$('sumbody').textContent='요약 실패: '+e}
  b.disabled=false}
 $('sumbtn').onclick=()=>summarize(false);
+{const box=document.querySelector('.sum'),tg=$('sumtoggle');
+ const sync=()=>tg.textContent=box.classList.contains('collapsed')?'펼치기':'접기';
+ if(innerWidth<=640&&!store.get('sumopen',false))box.classList.add('collapsed');sync();
+ tg.onclick=()=>{box.classList.toggle('collapsed');store.set('sumopen',!box.classList.contains('collapsed'));sync()};
+ const _s=summarize;summarize=async function(a){if(innerWidth<=640&&!a){box.classList.remove('collapsed');sync()}return _s(a)}}
 $('autosum').checked=store.get('autosum',true);
 $('autosum').onchange=()=>store.set('autosum',$('autosum').checked);
 {const h=store.get('sumhist',[]);if(h.length){$('sumbody').innerHTML=md(h[0].summary)+`<div class="sub">${esc(h[0].generated)} 생성 (저장된 요약)</div>`;$('sumbtn').textContent='다시 요약'}}
