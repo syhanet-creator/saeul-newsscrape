@@ -1,3 +1,8 @@
-from _common import make_handler, newscore
+from http.server import BaseHTTPRequestHandler
 
-handler = make_handler(newscore.collect)
+from _common import newscore, respond
+
+
+class handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        respond(self, newscore.collect)
