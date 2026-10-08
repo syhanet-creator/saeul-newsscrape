@@ -1,154 +1,34 @@
-"""한수원/새울본부 뉴스 스크랩 앱 - 실행할 때마다 구글 뉴스 RSS를 실시간 검색합니다.
+"""한수원/새울본부 뉴스 스크랩 앱 - 로컬 실행용.
 실행: python news_scrap.py  (브라우저가 자동으로 열립니다)
+Vercel 배포 시에는 public/index.html + api/news.py 가 사용됩니다.
 """
-import html
-import json
 import threading
 import webbrowser
-import urllib.parse
-import urllib.request
-import xml.etree.ElementTree as ET
-from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone
-from email.utils import parsedate_to_datetime
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import ThreadingHTTPServer
+from pathlib import Path
+
+from api.news import handler as NewsHandler
 
 PORT = 8765
-KEYWORDS = ["한국수력원자력", "새울원자력본부", "한수원", "새울본부"]
-UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) NewsScrap/1.0"
+INDEX = (Path(__file__).parent / "public" / "index.html").read_bytes()
 
 
-def fetch_keyword(kw, days):
-    q = f'"{kw}" when:{days}d'
-    url = ("https://news.google.com/rss/search?q=" + urllib.parse.quote(q)
-           + "&hl=ko&gl=KR&ceid=KR:ko")
-    req = urllib.request.Request(url, headers={"User-Agent": UA})
-    with urllib.request.urlopen(req, timeout=15) as r:
-        root = ET.fromstring(r.read())
-    items = []
-    for it in root.iter("item"):
-        title = it.findtext("title") or ""
-        source = it.findtext("source") or ""
-        if source and title.endswith(" - " + source):
-            title = title[: -len(source) - 3]
-        try:
-            dt = parsedate_to_datetime(it.findtext("pubDate")).astimezone(timezone.utc)
-        except Exception:
-            dt = datetime.fromtimestamp(0, timezone.utc)
-        items.append({
-            "title": html.unescape(title),
-            "link": it.findtext("link") or "",
-            "source": source,
-            "ts": dt.timestamp(),
-            "kw": kw,
-        })
-    return items
-
-
-def collect(days):
-    merged, errors = {}, []
-    with ThreadPoolExecutor(len(KEYWORDS)) as ex:
-        futs = {kw: ex.submit(fetch_keyword, kw, days) for kw in KEYWORDS}
-    for kw, f in futs.items():
-        try:
-            for a in f.result():
-                key = a["link"] or a["title"]
-                if key in merged:
-                    if kw not in merged[key]["kws"]:
-                        merged[key]["kws"].append(kw)
-                else:
-                    a["kws"] = [kw]
-                    del a["kw"]
-                    merged[key] = a
-        except Exception as e:
-            errors.append(f"{kw}: {e}")
-    arts = sorted(merged.values(), key=lambda a: a["ts"], reverse=True)
-    return {"articles": arts, "errors": errors, "keywords": KEYWORDS,
-            "fetched": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
-
-
-PAGE = """<!doctype html><html lang="ko"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>한수원 뉴스 스크랩</title>
-<style>
-:root{--bg:#f5f6f8;--card:#fff;--tx:#1b1f24;--mut:#6b7280;--ac:#0b5cad;--bd:#e3e6ea}
-@media(prefers-color-scheme:dark){:root{--bg:#14171b;--card:#1d2127;--tx:#e8eaed;--mut:#9aa0a8;--ac:#6fb1ff;--bd:#2c323a}}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 "Malgun Gothic",system-ui,sans-serif}
-.wrap{max-width:900px;margin:0 auto;padding:20px 16px 60px}
-h1{font-size:22px;margin:0 0 4px}.meta{color:var(--mut);font-size:13px;margin-bottom:14px}
-.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px}
-.chip{border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:999px;padding:5px 12px;cursor:pointer;font:inherit;font-size:13px}
-.chip.on{background:var(--ac);border-color:var(--ac);color:#fff}
-select,input,button.act{border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:8px;padding:6px 10px;font:inherit;font-size:13px}
-input{flex:1;min-width:140px}button.act{cursor:pointer}
-.item{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:12px 14px;margin-bottom:8px}
-.item a{color:var(--tx);text-decoration:none;font-weight:600}.item a:hover{color:var(--ac);text-decoration:underline}
-.sub{color:var(--mut);font-size:12.5px;margin-top:4px}.tag{color:var(--ac)}
-.err{background:#fde8e8;color:#9b1c1c;padding:8px 12px;border-radius:8px;margin-bottom:10px;font-size:13px}
-.empty{text-align:center;color:var(--mut);padding:40px}
-</style></head><body><div class="wrap">
-<h1>한수원 뉴스 스크랩</h1><div class="meta" id="meta">구글 뉴스에서 불러오는 중…</div>
-<div class="bar" id="chips"></div>
-<div class="bar"><input id="q" placeholder="결과 내 검색 (제목·언론사)">
-<select id="days"><option value="1">최근 1일</option><option value="3">최근 3일</option><option value="7" selected>최근 7일</option><option value="30">최근 30일</option></select>
-<button class="act" id="re">새로고침</button></div>
-<div id="errs"></div><div id="list"></div></div>
-<script>
-let data=null,active=new Set();
-const $=id=>document.getElementById(id);
-const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-function ago(ts){const m=Math.floor((Date.now()/1000-ts)/60);if(m<1)return'방금 전';if(m<60)return m+'분 전';
- const h=Math.floor(m/60);if(h<24)return h+'시간 전';return Math.floor(h/24)+'일 전'}
-function fmt(ts){const d=new Date(ts*1000),p=n=>String(n).padStart(2,'0');
- return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`}
-function render(){
- const q=$('q').value.trim().toLowerCase();
- const arts=data.articles.filter(a=>(!active.size||a.kws.some(k=>active.has(k)))&&
-  (!q||(a.title+a.source).toLowerCase().includes(q)));
- $('meta').textContent=`${data.fetched} 기준 · 전체 ${data.articles.length}건 · 표시 ${arts.length}건`;
- $('list').innerHTML=arts.length?arts.map(a=>`<div class="item"><a href="${esc(a.link)}" target="_blank" rel="noopener">${esc(a.title)}</a>
- <div class="sub">${esc(a.source)} · ${fmt(a.ts)} (${ago(a.ts)}) · <span class="tag">${a.kws.map(esc).join(', ')}</span></div></div>`).join(''):'<div class="empty">기사가 없습니다.</div>';
-}
-function chips(){
- $('chips').innerHTML=data.keywords.map(k=>`<button class="chip ${active.has(k)?'on':''}" data-k="${k}">${k}</button>`).join('');
- document.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{const k=b.dataset.k;active.has(k)?active.delete(k):active.add(k);chips();render()});
-}
-async function load(){
- $('meta').textContent='구글 뉴스에서 불러오는 중…';$('re').disabled=true;
- try{data=await (await fetch('/api/news?days='+$('days').value)).json();
-  $('errs').innerHTML=data.errors.map(e=>`<div class="err">${esc(e)}</div>`).join('');chips();render();
- }catch(e){$('meta').textContent='불러오기 실패: '+e}
- $('re').disabled=false;
-}
-$('re').onclick=load;$('days').onchange=load;$('q').oninput=()=>data&&render();
-load();
-</script></body></html>"""
-
-
-class Handler(BaseHTTPRequestHandler):
+class Handler(NewsHandler):
     def log_message(self, *a):
         pass
 
     def do_GET(self):
-        u = urllib.parse.urlparse(self.path)
-        if u.path == "/api/news":
-            try:
-                days = int(urllib.parse.parse_qs(u.query).get("days", ["7"])[0])
-            except ValueError:
-                days = 7
-            body = json.dumps(collect(max(1, min(days, 365))), ensure_ascii=False).encode()
-            ctype = "application/json; charset=utf-8"
-        elif u.path == "/":
-            body, ctype = PAGE.encode(), "text/html; charset=utf-8"
-        else:
+        if self.path.startswith("/api/news"):
+            return super().do_GET()
+        if self.path != "/":
             self.send_error(404)
             return
         self.send_response(200)
-        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Cache-Control", "no-store")
-        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Content-Length", str(len(INDEX)))
         self.end_headers()
-        self.wfile.write(body)
+        self.wfile.write(INDEX)
 
 
 if __name__ == "__main__":
