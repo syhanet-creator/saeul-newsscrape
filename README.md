@@ -13,6 +13,7 @@ python news_scrap.py
 
 ## 기능
 - 유사 기사 묶기: 제목 유사도로 같은 사안의 기사를 네모 상자로 묶어 표시
-- 주간 AI 요약: 최근 7일 기사를 Claude로 요약 (버튼 클릭 시에만 호출, 30분 캐시)
-  - 환경변수 `ANTHROPIC_API_KEY` 필요 (로컬: `$env:ANTHROPIC_API_KEY="sk-ant-..."` 후 실행 / Vercel: Project Settings → Environment Variables)
-  - 모델 변경: `SUMMARY_MODEL` (기본 claude-haiku-4-5-20251001)
+- 주간 AI 요약: 최근 7일 기사를 AI로 요약 (버튼 클릭 시에만 호출, 30분 캐시)
+  - 환경변수 `GEMINI_API_KEY` (Google AI Studio 무료 키) 또는 `ANTHROPIC_API_KEY` 중 하나 필요. 둘 다 있으면 Gemini 우선
+  - 로컬: `$env:GEMINI_API_KEY="..."` 후 실행 / Vercel: Project Settings -> Environment Variables 추가 후 Redeploy
+  - 모델 변경: `GEMINI_MODEL` (기본 gemini-2.5-flash), `SUMMARY_MODEL` (Claude, 기본 claude-haiku-4-5-20251001)

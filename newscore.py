@@ -4,6 +4,7 @@ import json
 import os
 import re
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -14,7 +15,8 @@ from email.utils import parsedate_to_datetime
 KEYWORDS = ["한국수력원자력", "새울원자력본부", "한수원", "새울본부"]
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) NewsScrap/1.0"
 SIM_THRESHOLD = 0.4
-MODEL = os.environ.get("SUMMARY_MODEL", "claude-haiku-4-5-20251001")
+CLAUDE_MODEL = os.environ.get("SUMMARY_MODEL", "claude-haiku-4-5-20251001")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
 _cache = {}
 
 
@@ -93,10 +95,55 @@ def collect(days):
             "fetched": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 
 
+def _post_json(url, headers, payload):
+    req = urllib.request.Request(url, data=json.dumps(payload).encode(),
+                                 headers={"content-type": "application/json", **headers})
+    try:
+        with urllib.request.urlopen(req, timeout=40) as r:
+            return json.load(r)
+    except urllib.error.HTTPError as e:
+        detail = e.read().decode("utf-8", "replace")
+        try:
+            detail = json.loads(detail)["error"]["message"]
+        except Exception:
+            pass
+        raise RuntimeError(_friendly(e.code, detail))
+
+
+def _friendly(code, detail):
+    d = detail.lower()
+    if "credit balance" in d:
+        return "API 크레딧이 부족합니다. 공급자 콘솔에서 충전해 주세요."
+    if code in (401, 403) or "api key" in d and ("invalid" in d or "not valid" in d):
+        return "API 키가 올바르지 않습니다. 환경변수를 확인해 주세요."
+    if code == 429 or "quota" in d or "rate" in d:
+        return "호출 한도를 초과했습니다. 잠시 후 다시 시도해 주세요."
+    return f"HTTP {code}: {detail[:200]}"
+
+
+def _ask_llm(prompt):
+    """GEMINI_API_KEY 가 있으면 Gemini, 없으면 ANTHROPIC_API_KEY 로 Claude 호출."""
+    gkey = os.environ.get("GEMINI_API_KEY")
+    if gkey:
+        r = _post_json(
+            f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent",
+            {"x-goog-api-key": gkey},
+            {"contents": [{"parts": [{"text": prompt}]}]})
+        return r["candidates"][0]["content"]["parts"][0]["text"]
+    akey = os.environ.get("ANTHROPIC_API_KEY")
+    if akey:
+        r = _post_json(
+            "https://api.anthropic.com/v1/messages",
+            {"x-api-key": akey, "anthropic-version": "2023-06-01"},
+            {"model": CLAUDE_MODEL, "max_tokens": 1200,
+             "messages": [{"role": "user", "content": prompt}]})
+        return r["content"][0]["text"]
+    raise RuntimeError("GEMINI_API_KEY 또는 ANTHROPIC_API_KEY 환경변수가 설정되지 않았습니다.")
+
+
 def weekly_summary(days=7):
-    key = os.environ.get("ANTHROPIC_API_KEY")
-    if not key:
-        return {"error": "ANTHROPIC_API_KEY 환경변수가 설정되지 않았습니다."}
+    if not (os.environ.get("GEMINI_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")):
+        return {"error": "GEMINI_API_KEY 또는 ANTHROPIC_API_KEY 환경변수가 설정되지 않았습니다."}
     hit = _cache.get(days)
     if hit and time.time() - hit[0] < 1800:
         return hit[1]
@@ -112,15 +159,8 @@ def weekly_summary(days=7):
               "한국어로 이번 주 주요 이슈를 요약해 주세요. 형식: 먼저 2~3문장 총평, 이어서 "
               "건수가 많은 순으로 주요 이슈 3~6개를 '- **이슈명**: 한두 문장 설명' 형태의 목록으로. "
               "목록에 없는 내용은 추측하지 마세요.\n\n" + "\n".join(lines))
-    body = json.dumps({"model": MODEL, "max_tokens": 1200,
-                       "messages": [{"role": "user", "content": prompt}]}).encode()
-    req = urllib.request.Request(
-        "https://api.anthropic.com/v1/messages", data=body,
-        headers={"x-api-key": key, "anthropic-version": "2023-06-01",
-                 "content-type": "application/json"})
     try:
-        with urllib.request.urlopen(req, timeout=40) as r:
-            text = json.load(r)["content"][0]["text"]
+        text = _ask_llm(prompt)
     except Exception as e:
         return {"error": f"AI 요약 호출 실패: {e}"}
     out = {"summary": text, "count": len(data["articles"]), "groups": len(groups),
