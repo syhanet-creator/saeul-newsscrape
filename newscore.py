@@ -387,8 +387,8 @@ def bing_find_url(title, domain):
         return ""
     clean = re.sub(r"[^0-9A-Za-z가-힣\s]", " ", title)
     clean = re.sub(r"\s+", " ", clean).strip()
-    # 검색어 두 가지: 제목 앞 25자(시험에서 일치율이 가장 높았다) -> 못 찾으면 제목 전체
-    queries = [q for q in dict.fromkeys([clean[:25].strip(), clean]) if q]
+    # site:신문사주소 로 그 신문사 기사만 검색한다(시험: 40건 중 일치 21건 -> 28건). 제목 앞 25자 -> 못 찾으면 제목 전체
+    queries = [f"site:{domain} {q}" for q in dict.fromkeys([clean[:25].strip(), clean]) if q]
     g = _grams(title)
     for q in queries:
         with _bing_lock:  # 한 서버에서는 순서대로, 0.4초 이상 간격
