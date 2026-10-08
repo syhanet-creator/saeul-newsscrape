@@ -16,7 +16,7 @@ KEYWORDS = ["한국수력원자력", "새울원자력본부", "한수원", "새�
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) NewsScrap/1.0"
 SIM_THRESHOLD = 0.4
 CLAUDE_MODEL = os.environ.get("SUMMARY_MODEL", "claude-haiku-4-5-20251001")
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.8-flash")
 _cache = {}
 
 
