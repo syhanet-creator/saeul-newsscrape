@@ -407,30 +407,6 @@ def author_for_google(link):
     return name, "ok"
 
 
-def debug_google(link):
-    """(임시) 구글 링크가 어떤 주소로 풀리고 그 페이지를 서버가 어떻게 받는지 보여 준다."""
-    out = {}
-    try:
-        out["url"] = resolve_google(link)
-        if out["url"]:
-            req = urllib.request.Request(out["url"], headers={"User-Agent": _BROWSER_UA})
-            with urllib.request.urlopen(req, timeout=10) as r:
-                out["http"] = r.status
-                out["final"] = r.geturl()
-                raw = r.read(400000).decode("utf-8", "replace")
-            out["len"] = len(raw)
-            out["head"] = raw[:100]
-            out["title"] = (re.search(r"<title[^>]*>(.*?)</title>", raw, re.S) or [None, ""])[1].strip()[:80]
-            out["has_h1"] = "<h1" in raw
-            out["author"] = page_author(raw)
-            out["canonical"] = _canonical(raw, out["url"])
-            out["meta"] = [m.group(0)[:90] for m in _META_AUTH.finditer(raw)][:3]
-            out["byline"] = [m.group(0) for m in BYLINE_RE.finditer(html.unescape(_TAG.sub(" ", raw)))][:3]
-    except Exception as e:
-        out["error"] = f"{type(e).__name__}: {str(e)[:80]}"
-    return out
-
-
 def _get_page(url, timeout=10):
     req = urllib.request.Request(url, headers={"User-Agent": _BROWSER_UA})
     with urllib.request.urlopen(req, timeout=timeout) as r:

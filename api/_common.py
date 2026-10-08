@@ -42,8 +42,6 @@ def author_response(h, newscore):
     link = urllib.parse.parse_qs(urllib.parse.urlparse(h.path).query).get("u", [""])[0]
     if not link.startswith(newscore.GN_LINK) or len(link) > 600:
         return send_json(h, {"error": "bad link"}, status=400)
-    if "debug=1" in h.path:  # 임시 진단: 서버가 실제로 받은 원문 주소와 페이지 상태
-        return send_json(h, newscore.debug_google(link))
     name, status = newscore.author_for_google(link)
     if status == "ok":
         cc = "public, s-maxage=604800, stale-while-revalidate=86400" if name else "public, s-maxage=86400"
