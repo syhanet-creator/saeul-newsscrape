@@ -85,6 +85,8 @@ details.kw{margin-bottom:12px;font-size:13px}details.kw summary{cursor:pointer;c
 .box .item{background:var(--card)}
 .err{background:#fde8e8;color:#9b1c1c;padding:8px 12px;border-radius:10px;margin-bottom:10px;font-size:13px}
 @media(prefers-color-scheme:dark){.err{background:#3a1b1d;color:#ffb4b8}}
+.note{background:#fff6e0;color:#7a5200;border:1px solid #f1d28a;padding:8px 12px;border-radius:10px;margin-bottom:10px;font-size:13px}
+@media(prefers-color-scheme:dark){.note{background:#3a2e12;color:#ffd98a;border-color:#6b5217}}
 .empty{text-align:center;color:var(--mut);padding:48px 0}
 .foot{margin-top:28px;text-align:center;color:var(--mut);font-size:12px;line-height:1.7}
 .scroll{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
@@ -235,7 +237,7 @@ let loadSeq=0;
 async function load(){
  const my=++loadSeq;$('meta').textContent='불러오는 중…';$('re').disabled=true;
  const base='/api/news?days='+$('days').value+'&kw='+encodeURIComponent(kws.join(','));
- const apply=d=>{data=d;$('errs').innerHTML=d.errors.map(e=>`<div class="err">${esc(e)}</div>`).join('');
+ const apply=d=>{data=d;$('errs').innerHTML=d.errors.length?`<div class="note">⚠ 일부 출처 응답이 느립니다: ${d.errors.map(e=>esc(e.split(':')[0])).join(', ')} — 잠시 후 <b>새로고침</b>하면 보완됩니다.</div>`:'';
   active=new Set([...active].filter(k=>d.keywords.includes(k)));chips();render()};
  try{
   /* 1단계: 구글 뉴스만 먼저 표시, 2단계: 지역 신문까지 합쳐서 갱신 */

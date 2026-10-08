@@ -19,6 +19,7 @@ KEYWORDS = ["한국수력원자력", "새울원자력본부", "한수원", "새�
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) NewsScrap/1.0"
 KST = timezone(timedelta(hours=9))
 SIM_THRESHOLD = 0.4
+FETCH_TIMEOUT = 10  # 지역 신문 한 번 요청의 제한 시간(초). 시간 초과 시 한 번 더 시도한다.
 CLAUDE_MODEL = os.environ.get("SUMMARY_MODEL", "claude-haiku-4-5-20251001")
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.8-flash")
 _cache = {}
@@ -40,7 +41,7 @@ def fetch_google(kw, days):
     url = ("https://news.google.com/rss/search?q=" + urllib.parse.quote(q)
            + "&hl=ko&gl=KR&ceid=KR:ko")
     req = urllib.request.Request(url, headers={"User-Agent": UA})
-    with urllib.request.urlopen(req, timeout=15) as r:
+    with urllib.request.urlopen(req, timeout=FETCH_TIMEOUT) as r:
         root = ET.fromstring(r.read())
     items = []
     for it in root.iter("item"):
@@ -67,7 +68,7 @@ def local_paper(name, base):
         q = urllib.parse.urlencode({"submit": "submit", "search_and": 1, "search_exec": "all",
                                     "search_section": "all", "news_order": 1, "search": kw})
         req = urllib.request.Request(base + "/search.html?" + q, headers={"User-Agent": UA})
-        with urllib.request.urlopen(req, timeout=15) as r:
+        with urllib.request.urlopen(req, timeout=FETCH_TIMEOUT) as r:
             page = r.read().decode("utf-8", "replace")
         limit = time.time() - days * 86400
         items = []
@@ -93,7 +94,7 @@ def fetch_ucinews(kw, days):
     # 검색 폼이 POST 방식이다(GET 은 검색어를 무시한다).
     data = urllib.parse.urlencode({"sc_area": "A", "sc_word": kw}).encode()
     req = urllib.request.Request(base + "/news/articleList.html", data=data, headers={"User-Agent": UA})
-    with urllib.request.urlopen(req, timeout=15) as r:
+    with urllib.request.urlopen(req, timeout=FETCH_TIMEOUT) as r:
         page = r.read().decode("utf-8", "replace")
     limit = time.time() - days * 86400
     items = []
@@ -112,7 +113,7 @@ def _iusm_feed():
     """울산매일 전체기사 RSS 는 2분간 한 번만 받아 키워드별 호출이 같이 쓴다."""
     if time.time() - _iusm["t"] > 120:
         req = urllib.request.Request("https://www.iusm.co.kr/rss/allArticle.xml", headers={"User-Agent": UA})
-        with urllib.request.urlopen(req, timeout=15) as r:
+        with urllib.request.urlopen(req, timeout=FETCH_TIMEOUT) as r:
             root = ET.fromstring(r.read())
         items = []
         for it in root.iter("item"):
@@ -176,7 +177,7 @@ def cms_site(name, base, url, method="GET", extra=None, kwname="sc_word"):
             req = urllib.request.Request(url, data=enc.encode(), headers={"User-Agent": UA})
         else:
             req = urllib.request.Request(url + "?" + enc, headers={"User-Agent": UA})
-        with urllib.request.urlopen(req, timeout=15) as r:
+        with urllib.request.urlopen(req, timeout=FETCH_TIMEOUT) as r:
             raw = r.read(1_500_000)
         try:
             page = raw.decode("utf-8")
@@ -215,20 +216,28 @@ def _cached(name, fn, kw, days, ttl=120):
     hit = _fcache.get(key)
     if hit and time.time() - hit[0] < ttl:
         return [dict(a) for a in hit[1]]
-    if name == "google":
-        res = fn(kw, days)
-    else:
-        # 지역 신문은 같은 사이트에 요청을 동시에 보내지 않고 순서대로, 429 면 잠시 후 한 번 더.
-        with _locks[name]:
-            for attempt in (0, 1):
-                try:
-                    res = fn(kw, days)
-                    break
-                except urllib.error.HTTPError as e:
-                    if e.code != 429 or attempt:
-                        raise
-                    time.sleep(1.5)
-            time.sleep(0.1)
+    try:
+        if name == "google":
+            res = fn(kw, days)
+        else:
+            # 지역 신문은 같은 사이트에 요청을 동시에 많이 보내지 않고, 429·시간 초과면 한 번 더 시도한다.
+            with _locks[name]:
+                for attempt in (0, 1):
+                    try:
+                        res = fn(kw, days)
+                        break
+                    except urllib.error.HTTPError as e:
+                        if e.code != 429 or attempt:
+                            raise
+                        time.sleep(1.5)
+                    except (TimeoutError, urllib.error.URLError):
+                        if attempt:
+                            raise
+                time.sleep(0.1)
+    except Exception:
+        if hit:  # 실패하면 직전에 받아 둔 결과(오래됐어도)를 대신 쓴다.
+            return [dict(a) for a in hit[1]]
+        raise
     _fcache[key] = (time.time(), res)
     return [dict(a) for a in res]
 
@@ -279,7 +288,7 @@ def collect(days, kws=None, fast=False):
                     a.setdefault("local", False)
                     merged[key] = a
         except Exception as e:
-            failed.setdefault(name, f"{name}: 일부 키워드 수집 실패 ({kw}: {e})")
+            failed.setdefault(name, f"{name}: 응답이 느려 일부 결과가 빠졌을 수 있습니다")
     arts = sorted(merged.values(), key=lambda a: a["ts"], reverse=True)
     cluster(arts)
     return {"articles": arts, "errors": list(failed.values()), "keywords": kws,

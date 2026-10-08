@@ -22,6 +22,8 @@ def respond(h, fn, ttl=0):
     days, kws, fast = parse_query(h.path)
     result = fn(days, kws, fast)
     body = json.dumps(result, ensure_ascii=False).encode()
+    if isinstance(result, dict) and result.get("errors"):
+        ttl = min(ttl, 10)  # 일부 출처가 실패한 응답은 오래 공유하지 않는다
     cacheable = ttl > 0 and not (isinstance(result, dict) and result.get("error"))
     h.send_response(200)
     h.send_header("Content-Type", "application/json; charset=utf-8")
