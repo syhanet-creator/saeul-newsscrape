@@ -146,7 +146,7 @@ details.kw{margin-bottom:12px;font-size:13px}details.kw summary{cursor:pointer;c
 </div>
 
 <div class="sum"><h2><span class="tt">AI 주간 브리핑 · 7일</span><span class="hb"><button class="act mob" id="sumtoggle">펼치기</button><button class="act primary" id="sumbtn">요약 생성</button></span></h2>
-<div class="body" id="sumbody">버튼을 누르면 최근 7일 기사를 AI가 요약합니다.</div>
+<div class="body" id="sumbody">버튼을 누르면 최근 7일 기사를 AI가 요약합니다. (기본 키워드 기준, 1시간 동안 모두에게 공유)</div>
 <label class="ck" style="margin-top:8px"><input type="checkbox" id="autosum"> 매주 처음 열 때 자동 요약 (이 브라우저에 보관)</label>
 <details><summary>지난 요약 보기 (<span id="hn">0</span>)</summary><div id="hist"></div></details></div>
 
@@ -275,7 +275,7 @@ function histRender(){const h=store.get('sumhist',[]);$('hn').textContent=h.leng
  $('hist').innerHTML=h.map(x=>`<div class="hist"><div class="sub">${esc(x.generated)} 생성 · ${esc(x.week)}</div><div class="body">${md(x.summary)}</div></div>`).join('')||'<div class="sub">아직 없습니다.</div>'}
 async function summarize(auto){
  const b=$('sumbtn');b.disabled=true;$('sumbody').textContent='AI가 요약하는 중… (최대 1분)';
- try{const r=await (await fetch('/api/summary?days=7&kw='+encodeURIComponent(kws.join(',')))).json();
+ try{const r=await (await fetch('/api/summary')).json();
   if(r.error){$('sumbody').innerHTML=`<div class="err">${esc(r.error)}</div>`}
   else{$('sumbody').innerHTML=md(r.summary)+`<div class="sub">${r.generated} 생성 · 기사 ${r.count}건 → ${r.groups}개 묶음 기준</div>`;
    const h=store.get('sumhist',[]).filter(x=>x.week!==weekId()||x.generated!==r.generated);

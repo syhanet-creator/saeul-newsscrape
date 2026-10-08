@@ -13,4 +13,4 @@ from _common import respond  # noqa: E402
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
-        respond(self, lambda d, k, f: newscore.collect(d, k, fast=f))
+        respond(self, lambda d, k, f: newscore.collect(d, k, fast=f), ttl=60)
