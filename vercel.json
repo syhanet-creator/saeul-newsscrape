@@ -1,5 +1,4 @@
 {
-  "regions": ["icn1"],
   "functions": {
     "api/news.py": { "maxDuration": 60, "includeFiles": "newscore.py" },
     "api/summary.py": { "maxDuration": 60, "includeFiles": "newscore.py" },

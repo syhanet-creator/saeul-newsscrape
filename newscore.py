@@ -236,6 +236,7 @@ SOURCES = (("google", fetch_google), ("울산뉴스넷", fetch_ulsannews),
            ("울산종합일보", fetch_ujnews))
 
 _fcache = {}
+_down = {}  # 출처 이름 -> 이 시각까지 건너뜀
 _locks = {name: threading.Semaphore(2) for name, _ in SOURCES}
 
 
@@ -245,6 +246,11 @@ def _cached(name, fn, kw, days, ttl=120):
     hit = _fcache.get(key)
     if hit and time.time() - hit[0] < ttl:
         return [dict(a) for a in hit[1]]
+    if name != "google" and time.time() < _down.get(name, 0):
+        # 방금 응답이 없던 출처는 1분간 건너뛴다(타임아웃이 쌓여 전체가 느려지는 것을 막는다). 저장분이 있으면 그것을 쓴다.
+        if hit:
+            return [dict(a) for a in hit[1]]
+        raise TimeoutError(f"{name} 일시 중단")
     try:
         if name == "google":
             res = fn(kw, days)
@@ -264,6 +270,8 @@ def _cached(name, fn, kw, days, ttl=120):
                             raise
                 time.sleep(0.1)
     except Exception:
+        if name != "google":
+            _down[name] = time.time() + 60
         if hit:  # 실패하면 직전에 받아 둔 결과(오래됐어도)를 대신 쓴다.
             return [dict(a) for a in hit[1]]
         raise
