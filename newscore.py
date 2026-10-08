@@ -81,12 +81,56 @@ def local_paper(name, base):
     return fetch
 
 
+UCI_ROW = re.compile(
+    r'<a href="(/news/articleView\.html\?idxno=\d+)" class="links"><strong>(.*?)</strong></a>.*?'
+    r'class="list-dated[^"]*">[^<]*?(\d{4}-\d\d-\d\d \d\d:\d\d)', re.S)
+
+
+def fetch_ucinews(kw, days):
+    """울산시민신문: 사이트 검색 결과 1페이지."""
+    base = "http://www.ucinews.kr"
+    # 검색 폼이 POST 방식이다(GET 은 검색어를 무시한다).
+    data = urllib.parse.urlencode({"sc_area": "A", "sc_word": kw}).encode()
+    req = urllib.request.Request(base + "/news/articleList.html", data=data, headers={"User-Agent": UA})
+    with urllib.request.urlopen(req, timeout=15) as r:
+        page = r.read().decode("utf-8", "replace")
+    limit = time.time() - days * 86400
+    items = []
+    for path, title, when in UCI_ROW.findall(page):
+        ts = datetime.strptime(when, "%Y-%m-%d %H:%M").replace(tzinfo=KST).timestamp()
+        if ts >= limit:
+            items.append({"title": html.unescape(re.sub(r"<[^>]+>", "", title)).strip(),
+                          "link": base + path, "source": "울산시민신문", "ts": ts, "local": True})
+    return items
+
+
+def fetch_iusm(kw, days):
+    """울산매일: 사이트 검색이 동작하지 않아 전체기사 RSS(최근 50건)에서 키워드가 든 기사만 고른다."""
+    req = urllib.request.Request("https://www.iusm.co.kr/rss/allArticle.xml", headers={"User-Agent": UA})
+    with urllib.request.urlopen(req, timeout=15) as r:
+        root = ET.fromstring(r.read())
+    limit = time.time() - days * 86400
+    items = []
+    for it in root.iter("item"):
+        title = (it.findtext("title") or "").strip()
+        if kw not in title and kw not in (it.findtext("description") or ""):
+            continue
+        try:
+            ts = datetime.strptime(it.findtext("pubDate").strip(), "%Y-%m-%d %H:%M:%S").replace(tzinfo=KST).timestamp()
+        except Exception:
+            continue
+        if ts >= limit:
+            items.append({"title": html.unescape(title), "link": (it.findtext("link") or "").strip(),
+                          "source": "울산매일", "ts": ts, "local": True})
+    return items
+
+
 fetch_ulsannews = local_paper("울산뉴스넷", "http://ulsannews.net")
 fetch_uljusinmun = local_paper("울주신문", "http://www.uljusinmun.co.kr")
 
 
 SOURCES = (("google", fetch_google), ("울산뉴스넷", fetch_ulsannews),
-           ("울주신문", fetch_uljusinmun))
+           ("울주신문", fetch_uljusinmun), ("울산시민신문", fetch_ucinews), ("울산매일", fetch_iusm))
 
 
 # ---------- 유사 기사 묶기 ----------

@@ -74,7 +74,7 @@ function card(a,i){const on=!!scraps[a.link];
  <div class="sub">${a.local?'<span class="loc">'+esc(a.source)+'</span>':esc(a.source)} · ${fmt(a.ts)} (${ago(a.ts)})${a.kws?' · <span class="tag">'+a.kws.map(esc).join(', ')+'</span>':''}</div></div></div>`}
 function tabs(){
  const n=Object.keys(scraps).length;
- $('tabs').innerHTML=[['all','전체'],['saeul','새울'],['local','지역(울산뉴스넷·울주신문)'],['scrap','★ 스크랩 '+n]]
+ $('tabs').innerHTML=[['all','전체'],['saeul','새울'],['local','지역신문'],['scrap','★ 스크랩 '+n]]
   .map(([k,t])=>`<button class="tab ${tab===k?'on':''}" data-t="${k}">${t}</button>`).join('');
  document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{tab=b.dataset.t;tabs();render()});
 }
