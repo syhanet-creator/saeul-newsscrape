@@ -53,8 +53,11 @@ def fetch_google(kw, days):
             dt = parsedate_to_datetime(it.findtext("pubDate")).astimezone(timezone.utc)
         except Exception:
             dt = datetime.fromtimestamp(0, timezone.utc)
+        src_el = it.find("source")
+        host = urllib.parse.urlparse((src_el.get("url") if src_el is not None else "") or "").hostname or ""
         items.append({"title": html.unescape(title), "link": it.findtext("link") or "",
-                      "source": source, "ts": dt.timestamp()})
+                      "source": source, "ts": dt.timestamp(),
+                      "domain": re.sub(r"^(www|m|mobile)\.", "", host)})  # 출처 사이트 주소(기자명을 같은 신문사에서만 빌리기 위해)
     return items
 
 
@@ -370,9 +373,18 @@ _bing_block = {"until": 0.0}
 _bing_lock = threading.Lock()
 
 
-def bing_find_url(title):
-    """같은 제목의 기사를 빙 뉴스 RSS 에서 찾아 원문 주소를 돌려준다(제목 유사도 0.6 이상). 없으면 ''.
-    빙 링크에는 원문 주소가 그대로 들어 있어 구글처럼 주소를 풀 필요가 없다. msn.com 모아보기 링크는 제외한다."""
+def same_site(url, domain):
+    """url 의 사이트가 domain(예: energydaily.co.kr)과 같은 신문사 사이트인지. www./m./mobile. 은 무시한다."""
+    host = re.sub(r"^(www|m|mobile)\.", "", urllib.parse.urlparse(url).hostname or "")
+    return bool(domain and host and (host == domain or host.endswith("." + domain) or domain.endswith("." + host)))
+
+
+def bing_find_url(title, domain):
+    """같은 신문사(domain)에서 낸 같은 제목의 기사를 빙 뉴스 RSS 에서 찾아 원문 주소를 돌려준다(제목 유사도 0.5 이상).
+    없으면 ''. 다른 신문사의 비슷한 기사는 작성자가 다를 수 있어 쓰지 않는다. domain 을 모르면 찾지 않는다.
+    빙 링크에는 원문 주소가 그대로 들어 있어 구글처럼 주소를 풀 필요가 없다."""
+    if not domain:
+        return ""
     clean = re.sub(r"[^0-9A-Za-z가-힣\s]", " ", title)
     clean = re.sub(r"\s+", " ", clean).strip()
     # 검색어 두 가지: 제목 앞 25자(시험에서 일치율이 가장 높았다) -> 못 찾으면 제목 전체
@@ -390,7 +402,7 @@ def bing_find_url(title):
         best_sim, best = 0.0, ""
         for it in root.iter("item"):
             real = urllib.parse.parse_qs(urllib.parse.urlparse(it.findtext("link") or "").query).get("url", [""])[0]
-            if not real or "msn.com" in real or "bing.com" in real:
+            if not real or not same_site(real, domain):
                 continue
             gg = _grams(it.findtext("title") or "")
             sim = len(g & gg) / max(1, len(g | gg))
@@ -401,15 +413,15 @@ def bing_find_url(title):
     return ""
 
 
-def author_for_article(link, title):
-    """기자 이름 조회. ① 빙에서 같은 제목의 기사를 찾아 그 원문에서 읽는다 ② 못 찾으면 구글 링크를 풀어서 읽는다.
+def author_for_article(link, title, domain=""):
+    """기자 이름 조회. ① 빙에서 **같은 신문사의** 같은 제목 기사를 찾아 그 원문에서 읽는다 ② 못 찾으면 구글 링크를 풀어서 읽는다.
     반환: (이름, 상태) 상태 = ok(이름이 비어 있을 수 있음) / blocked(구글·빙 모두 막힘) / fail"""
     if link in _authors:
         return _authors[link], "ok"
     bing_blocked = time.time() < _bing_block["until"]
     if title and not bing_blocked:
         try:
-            url = bing_find_url(title)
+            url = bing_find_url(title, domain)
             if url:
                 page = _get_page(url)
                 name = page_author(page)

@@ -43,7 +43,8 @@ def author_response(h, newscore):
     if not link.startswith(newscore.GN_LINK) or len(link) > 600:
         return send_json(h, {"error": "bad link"}, status=400)
     title = urllib.parse.parse_qs(urllib.parse.urlparse(h.path).query).get("t", [""])[0][:200]
-    name, status = newscore.author_for_article(link, title)
+    domain = urllib.parse.parse_qs(urllib.parse.urlparse(h.path).query).get("d", [""])[0][:100]
+    name, status = newscore.author_for_article(link, title, domain)
     if status == "ok":
         cc = "public, s-maxage=604800, stale-while-revalidate=86400" if name else "public, s-maxage=86400"
     else:
