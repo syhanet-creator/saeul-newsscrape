@@ -318,7 +318,11 @@ def resolve_google(link, timeout=10):
                                  headers={**hdr, "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"})
     res = urllib.request.urlopen(req, timeout=timeout).read().decode("utf-8", "replace")
     # 응답은 JSON 안의 JSON 이라 주소 속 '=' '&' 가 = & 처럼 이스케이프돼 있다 -> 풀어서 돌려준다.
-    m = re.search(r'garturlres\\+",\\+"(https?:.+?)\\+"', res)
+    return _extract_gn_url(res)
+
+
+def _extract_gn_url(res):
+    m = re.search(r'garturlres\\*"\s*,\s*\\*"(https?:.+?)\\*"', res)
     if not m:
         return ""
     url = re.sub(r"\\+u([0-9a-fA-F]{4})", lambda x: chr(int(x.group(1), 16)), m.group(1))
