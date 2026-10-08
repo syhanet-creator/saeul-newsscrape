@@ -411,6 +411,7 @@ def debug_google(link):
                 out["final"] = r.geturl()
                 raw = r.read(400000).decode("utf-8", "replace")
             out["len"] = len(raw)
+            out["head"] = raw[:100]
             out["title"] = (re.search(r"<title[^>]*>(.*?)</title>", raw, re.S) or [None, ""])[1].strip()[:80]
             out["has_h1"] = "<h1" in raw
             out["author"] = page_author(raw)
