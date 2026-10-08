@@ -95,11 +95,17 @@ def collect(days):
             "fetched": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 
 
-def _post_json(url, headers, payload):
+class ApiError(RuntimeError):
+    def __init__(self, code, msg):
+        super().__init__(msg)
+        self.code = code
+
+
+def _post_json(url, headers, payload, timeout=50):
     req = urllib.request.Request(url, data=json.dumps(payload).encode(),
                                  headers={"content-type": "application/json", **headers})
     try:
-        with urllib.request.urlopen(req, timeout=50) as r:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
             return json.load(r)
     except urllib.error.HTTPError as e:
         detail = e.read().decode("utf-8", "replace")
@@ -107,7 +113,7 @@ def _post_json(url, headers, payload):
             detail = json.loads(detail)["error"]["message"]
         except Exception:
             pass
-        raise RuntimeError(_friendly(e.code, detail))
+        raise ApiError(e.code, _friendly(e.code, detail))
 
 
 def _friendly(code, detail):
@@ -125,11 +131,22 @@ def _ask_llm(prompt):
     """GEMINI_API_KEY 가 있으면 Gemini, 없으면 ANTHROPIC_API_KEY 로 Claude 호출."""
     gkey = os.environ.get("GEMINI_API_KEY")
     if gkey:
-        r = _post_json(
-            f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent",
-            {"x-goog-api-key": gkey},
-            {"contents": [{"parts": [{"text": prompt}]}]})
-        return r["candidates"][0]["content"]["parts"][0]["text"]
+        last = None
+        # 과부하(503)·모델 없음(404)·한도(429)면 다음 모델로 넘어간다.
+        for model in (GEMINI_MODEL, "gemini-flash-latest", "gemini-flash-lite-latest"):
+            try:
+                r = _post_json(
+                    f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+                    {"x-goog-api-key": gkey},
+                    {"contents": [{"parts": [{"text": prompt}]}]}, timeout=18)
+                return r["candidates"][0]["content"]["parts"][0]["text"]
+            except ApiError as e:
+                last = e
+                if e.code not in (404, 429, 500, 503):
+                    raise
+            except TimeoutError as e:
+                last = e
+        raise last
     akey = os.environ.get("ANTHROPIC_API_KEY")
     if akey:
         r = _post_json(
