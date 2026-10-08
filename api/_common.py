@@ -44,9 +44,9 @@ def author_response(h, newscore):
         return send_json(h, {"error": "bad link"}, status=400)
     title = urllib.parse.parse_qs(urllib.parse.urlparse(h.path).query).get("t", [""])[0][:200]
     domain = urllib.parse.parse_qs(urllib.parse.urlparse(h.path).query).get("d", [""])[0][:100]
-    name, status = newscore.author_for_article(link, title, domain)
+    name, status, via = newscore.author_for_article(link, title, domain)
     if status == "ok":
         cc = "public, s-maxage=604800, stale-while-revalidate=86400" if name else "public, s-maxage=86400"
     else:
         cc = "no-store"  # 차단·실패는 캐시하지 않는다
-    send_json(h, {"author": name, "status": status}, cc)
+    send_json(h, {"author": name, "status": status, "via": via}, cc)

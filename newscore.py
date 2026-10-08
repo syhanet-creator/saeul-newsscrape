@@ -368,6 +368,7 @@ _authors = {}  # 기사 링크 -> 기자 이름(본문 페이지에서 읽은 �
 _AUTHOR_META = re.compile(r'property="(?:dable:author|og:article:author)"\s*content="([^"]*)"')
 
 
+_fails = {}  # 기사 링크 -> 마지막 조회 실패 시각
 _bing_last = {"t": 0.0}
 _bing_block = {"until": 0.0}
 _bing_lock = threading.Lock()
@@ -415,9 +416,12 @@ def bing_find_url(title, domain):
 
 def author_for_article(link, title, domain=""):
     """기자 이름 조회. ① 빙에서 **같은 신문사의** 같은 제목 기사를 찾아 그 원문에서 읽는다 ② 못 찾으면 구글 링크를 풀어서 읽는다.
-    반환: (이름, 상태) 상태 = ok(이름이 비어 있을 수 있음) / blocked(구글·빙 모두 막힘) / fail"""
+    반환: (이름, 상태, 출처) 상태 = ok(이름이 비어 있을 수 있음) / blocked(구글·빙 모두 막힘) / fail.
+    출처 = mem(서버가 이미 알고 있어 외부에 묻지 않음) / bing / google (화면이 '느린 조회'를 세는 데 쓴다)"""
     if link in _authors:
-        return _authors[link], "ok"
+        return _authors[link], "ok", "mem"
+    if time.time() - _fails.get(link, 0) < 1800:  # 방금 실패한 기사는 30분간 다시 묻지 않는다
+        return "", "fail", "mem"
     bing_blocked = time.time() < _bing_block["until"]
     if title and not bing_blocked:
         try:
@@ -433,7 +437,7 @@ def author_for_article(link, title, domain=""):
                         except Exception:
                             pass
                 _authors[link] = name
-                return name, "ok"
+                return name, "ok", "bing"
         except urllib.error.HTTPError as e:
             if e.code in (429, 503):
                 _bing_block["until"] = time.time() + 60
@@ -442,8 +446,10 @@ def author_for_article(link, title, domain=""):
             pass
     name, status = author_for_google(link)
     if status == "blocked" and not bing_blocked:
-        return "", "fail"  # 구글만 막힘: 빙은 계속 쓸 수 있으니 이 기사만 건너뛴다
-    return name, status
+        status = "fail"  # 구글만 막힘: 빙은 계속 쓸 수 있으니 이 기사만 건너뛴다
+    if status == "fail":
+        _fails[link] = time.time()
+    return name, status, "google"
 
 
 _gn_block = {"until": 0.0}  # 구글이 429 로 막으면 이 시각까지 구글 요청을 하지 않는다

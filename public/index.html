@@ -331,13 +331,15 @@ async function fetchAuthors(){
   for(const a of todo){
    /* 서버에 이미 저장돼 즉시 오는 결과는 제한 없이, 서버가 새로 알아봐야 하는(느린) 조회만 한 번에 25건까지 */
    if(slow>=25||!data)break;n++;const t0=Date.now();let r;
-   try{r=await (await fetch('/api/author?v=5&u='+encodeURIComponent(a.link)+'&t='+encodeURIComponent(a.title)+'&d='+encodeURIComponent(a.domain||''))).json()}catch(e){break}
-   const ms=Date.now()-t0;if(ms>=600)slow++;
+   let resp;
+   try{resp=await fetch('/api/author?v=5&u='+encodeURIComponent(a.link)+'&t='+encodeURIComponent(a.title)+'&d='+encodeURIComponent(a.domain||''));r=await resp.json()}catch(e){break}
+   /* 서버가 외부(빙·구글)에 실제로 물어본 조회만 '느린 조회'로 센다(저장분·서버 기억은 제한 없음) */
+   const ms=Date.now()-t0;const costly=resp.headers.get('x-vercel-cache')!=='HIT'&&r.via!=='mem';if(costly)slow++;
    if(r.status==='blocked'){authPausedUntil=Date.now()+180000;break}   /* 구글이 막으면 3분 쉰다 */
-   if(r.status!=='ok'){authFailed.add(a.link);await new Promise(res=>setTimeout(res,ms<600?120:800));continue}
+   if(r.status!=='ok'){authFailed.add(a.link);await new Promise(res=>setTimeout(res,costly?800:100));continue}
    authMap[a.link]=r.author||'';
    if(r.author&&!sameAsOutlet(a,r.author)){data.articles.forEach(x=>{if(x.link===a.link)x.author=r.author});if(++changed%4===0)render()}
-   await new Promise(res=>setTimeout(res,ms<600?120:1500));   /* 저장분에서 온 건 빠르게, 아니면 천천히 */
+   await new Promise(res=>setTimeout(res,costly?1500:100));   /* 저장분에서 온 건 빠르게, 서버가 새로 물어본 건 천천히 */
   }
  }finally{
   authBusy=false;if(n>0)render();  /* 조회를 마친 기사에 '기자 미확인'이 반영되도록 */
