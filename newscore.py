@@ -317,8 +317,12 @@ def resolve_google(link, timeout=10):
     req = urllib.request.Request("https://news.google.com/_/DotsSplashUi/data/batchexecute", data=body,
                                  headers={**hdr, "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"})
     res = urllib.request.urlopen(req, timeout=timeout).read().decode("utf-8", "replace")
-    m = re.search(r'garturlres.{0,6}?(https?:[^"\\]+)', res)
-    return m.group(1) if m else ""
+    # 응답은 JSON 안의 JSON 이라 주소 속 '=' '&' 가 = & 처럼 이스케이프돼 있다 -> 풀어서 돌려준다.
+    m = re.search(r'garturlres\\+",\\+"(https?:.+?)\\+"', res)
+    if not m:
+        return ""
+    url = re.sub(r"\\+u([0-9a-fA-F]{4})", lambda x: chr(int(x.group(1), 16)), m.group(1))
+    return url.replace("\\/", "/")
 
 
 _META_AUTH = re.compile(
