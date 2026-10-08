@@ -19,7 +19,7 @@ KEYWORDS = ["한국수력원자력", "새울원자력본부", "한수원", "새�
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) NewsScrap/1.0"
 KST = timezone(timedelta(hours=9))
 SIM_THRESHOLD = 0.4
-FETCH_TIMEOUT = 10  # 지역 신문 한 번 요청의 제한 시간(초). 시간 초과 시 한 번 더 시도한다.
+FETCH_TIMEOUT = 8  # 지역 신문 한 번 요청의 제한 시간(초). 시간 초과 시 한 번 더 시도한다.
 CLAUDE_MODEL = os.environ.get("SUMMARY_MODEL", "claude-haiku-4-5-20251001")
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.8-flash")
 _cache = {}
@@ -246,17 +246,15 @@ def _cached(name, fn, kw, days, ttl=120):
     hit = _fcache.get(key)
     if hit and time.time() - hit[0] < ttl:
         return [dict(a) for a in hit[1]]
-    if name != "google" and time.time() < _down.get(name, 0):
-        # 방금 응답이 없던 출처는 1분간 건너뛴다(타임아웃이 쌓여 전체가 느려지는 것을 막는다). 저장분이 있으면 그것을 쓴다.
-        if hit:
-            return [dict(a) for a in hit[1]]
-        raise TimeoutError(f"{name} 일시 중단")
     try:
         if name == "google":
             res = fn(kw, days)
         else:
-            # 지역 신문은 같은 사이트에 요청을 동시에 많이 보내지 않고, 429·시간 초과면 한 번 더 시도한다.
+            # 지역 신문은 같은 사이트에 요청을 동시에 많이 보내지 않는다. 429 면 한 번 더 시도하고,
+            # 응답이 없으면(시간 초과) 그 출처를 1분간 건너뛴다 -> 느린 사이트 하나가 전체를 붙잡지 못한다.
             with _locks[name]:
+                if time.time() < _down.get(name, 0):  # 차례를 기다리는 사이 다른 요청이 이미 실패했다면 바로 포기
+                    raise TimeoutError(f"{name} 일시 중단")
                 for attempt in (0, 1):
                     try:
                         res = fn(kw, days)
@@ -266,12 +264,10 @@ def _cached(name, fn, kw, days, ttl=120):
                             raise
                         time.sleep(1.5)
                     except (TimeoutError, urllib.error.URLError):
-                        if attempt:
-                            raise
+                        _down[name] = time.time() + 60
+                        raise
                 time.sleep(0.1)
     except Exception:
-        if name != "google":
-            _down[name] = time.time() + 60
         if hit:  # 실패하면 직전에 받아 둔 결과(오래됐어도)를 대신 쓴다.
             return [dict(a) for a in hit[1]]
         raise
