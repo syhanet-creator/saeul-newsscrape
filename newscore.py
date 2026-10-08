@@ -1,4 +1,4 @@
-"""뉴스 수집(구글 뉴스 RSS + 울산뉴스넷 + 선택적 네이버) + 스팸 제외 + 유사 기사 묶기 + 주간 AI 요약.
+"""뉴스 수집(구글 뉴스 RSS + 울산뉴스넷 + 울주신문) + 스팸 제외 + 유사 기사 묶기 + 주간 AI 요약.
 Vercel 함수와 로컬 서버가 함께 쓴다.
 """
 import html
@@ -85,31 +85,8 @@ fetch_ulsannews = local_paper("울산뉴스넷", "http://ulsannews.net")
 fetch_uljusinmun = local_paper("울주신문", "http://www.uljusinmun.co.kr")
 
 
-def fetch_naver(kw, days):
-    """네이버 검색 API (NAVER_CLIENT_ID / NAVER_CLIENT_SECRET 이 있을 때만 사용)."""
-    cid, sec = os.environ.get("NAVER_CLIENT_ID"), os.environ.get("NAVER_CLIENT_SECRET")
-    if not (cid and sec):
-        return []
-    url = ("https://openapi.naver.com/v1/search/news.json?display=100&sort=date&query="
-           + urllib.parse.quote(kw))
-    req = urllib.request.Request(url, headers={"X-Naver-Client-Id": cid, "X-Naver-Client-Secret": sec})
-    with urllib.request.urlopen(req, timeout=15) as r:
-        data = json.load(r)
-    limit = time.time() - days * 86400
-    items = []
-    for it in data.get("items", []):
-        ts = parsedate_to_datetime(it["pubDate"]).timestamp()
-        if ts < limit:
-            continue
-        link = it.get("originallink") or it["link"]
-        host = urllib.parse.urlparse(link).netloc.replace("www.", "")
-        title = html.unescape(re.sub(r"<[^>]+>", "", it["title"]))
-        items.append({"title": title, "link": link, "source": host, "ts": ts})
-    return items
-
-
 SOURCES = (("google", fetch_google), ("울산뉴스넷", fetch_ulsannews),
-           ("울주신문", fetch_uljusinmun), ("naver", fetch_naver))
+           ("울주신문", fetch_uljusinmun))
 
 
 # ---------- 유사 기사 묶기 ----------
