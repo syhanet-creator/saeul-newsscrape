@@ -90,14 +90,23 @@ details.kw{margin-bottom:12px;font-size:13px}details.kw summary{cursor:pointer;c
 .scroll{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
 .scroll::-webkit-scrollbar{display:none}.scroll>*{flex:0 0 auto}
 
+/* ---------- 터치 기기(태블릿 포함) ---------- */
+@media(pointer:coarse){
+ input[type=text],select,button.act{font-size:16px;min-height:44px}
+ .chip{min-height:40px;padding:8px 14px;font-size:14px}
+ .tab{padding:11px 8px}
+ label.ck{min-height:36px;gap:8px}label.ck input{width:20px;height:20px}
+ .star{min-width:40px;min-height:44px}
+ summary{min-height:36px;display:flex;align-items:center}
+}
 /* ---------- 모바일 ---------- */
 @media(max-width:640px){
- .hero{padding:20px 0 64px}.hero svg.atom{width:260px;height:260px;right:-80px;top:-50px}
- h1{font-size:23px}.lead{font-size:13px}.meta{font-size:12px}
- .wrap{padding:0 12px 48px;margin-top:-46px}
- .kpis{grid-template-columns:repeat(2,1fr);gap:8px}.kpi b{font-size:21px}
+ .hero{padding:16px 0 52px}.hero svg.atom{width:260px;height:260px;right:-80px;top:-50px}
+ h1{font-size:22px;margin:6px 0 4px}.lead{font-size:13px}.meta{font-size:12px;margin-top:6px}
+ .wrap{padding:0 12px 48px;margin-top:-38px}
+ .kpis{grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px}.kpi{padding:8px 8px 8px 10px;border-radius:12px}.kpi b{font-size:19px}.kpi span{font-size:11px}
  input[type=text],select,button.act{font-size:16px;min-height:44px;padding:8px 12px}
- .bar>input[type=text]{flex:1 1 100%}.bar>select{flex:1 1 0}.bar>#re{flex:1 1 0}
+ .bar{margin-bottom:8px}.bar>input[type=text]{flex:1 1 100%}.bar>select{flex:1 1 0}.bar>#re{flex:1 1 0}
  #scrapbar{margin-left:0!important;width:100%;display:flex;gap:8px}#scrapbar button{flex:1 1 0}
  .tab{padding:10px 4px;font-size:13.5px}.tab .n{display:none}
  .chip{min-height:40px;padding:8px 14px;font-size:14px}
@@ -130,9 +139,9 @@ details.kw{margin-bottom:12px;font-size:13px}details.kw summary{cursor:pointer;c
 
 <div class="wrap">
 <div class="kpis">
- <div class="kpi"><b id="k1">–</b><span>전체 기사</span></div>
+ <div class="kpi"><b id="k1">–</b><span>전체</span></div>
  <div class="kpi k2"><b id="k2">–</b><span>새울 관련</span></div>
- <div class="kpi k3"><b id="k3">–</b><span>지역신문 보도</span></div>
+ <div class="kpi k3"><b id="k3">–</b><span>지역신문</span></div>
  <div class="kpi k4"><b id="k4">–</b><span>오늘 신규</span></div>
 </div>
 
