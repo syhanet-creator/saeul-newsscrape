@@ -11,6 +11,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import newscore
+from api._common import parse_query
 
 PORT = 8765
 INDEX = (Path(__file__).parent / "public" / "index.html").read_bytes()
@@ -24,11 +25,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         u = urllib.parse.urlparse(self.path)
         if u.path in ROUTES:
-            try:
-                days = int(urllib.parse.parse_qs(u.query).get("days", ["7"])[0])
-            except ValueError:
-                days = 7
-            body = json.dumps(ROUTES[u.path](max(1, min(days, 365))), ensure_ascii=False).encode()
+            days, kws = parse_query(self.path)
+            body = json.dumps(ROUTES[u.path](days, kws), ensure_ascii=False).encode()
             ctype = "application/json; charset=utf-8"
         elif u.path == "/":
             body, ctype = INDEX, "text/html; charset=utf-8"

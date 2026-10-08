@@ -2,73 +2,163 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>한수원 뉴스 스크랩</title>
 <style>
-:root{--bg:#f5f6f8;--card:#fff;--tx:#1b1f24;--mut:#6b7280;--ac:#0b5cad;--bd:#e3e6ea}
-@media(prefers-color-scheme:dark){:root{--bg:#14171b;--card:#1d2127;--tx:#e8eaed;--mut:#9aa0a8;--ac:#6fb1ff;--bd:#2c323a}}
+:root{--bg:#f5f6f8;--card:#fff;--tx:#1b1f24;--mut:#6b7280;--ac:#0b5cad;--bd:#e3e6ea;--star:#e8a100}
+@media(prefers-color-scheme:dark){:root{--bg:#14171b;--card:#1d2127;--tx:#e8eaed;--mut:#9aa0a8;--ac:#6fb1ff;--bd:#2c323a;--star:#ffc233}}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 "Malgun Gothic",system-ui,sans-serif}
 .wrap{max-width:900px;margin:0 auto;padding:20px 16px 60px}
 h1{font-size:22px;margin:0 0 4px}.meta{color:var(--mut);font-size:13px;margin-bottom:14px}
-.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px}
-.chip{border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:999px;padding:5px 12px;cursor:pointer;font:inherit;font-size:13px}
-.chip.on{background:var(--ac);border-color:var(--ac);color:#fff}
-select,input,button.act{border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:8px;padding:6px 10px;font:inherit;font-size:13px}
-input{flex:1;min-width:140px}button.act{cursor:pointer}
-.item{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:12px 14px;margin-bottom:8px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+.chip,.tab{border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:999px;padding:5px 12px;cursor:pointer;font:inherit;font-size:13px}
+.chip.on,.tab.on{background:var(--ac);border-color:var(--ac);color:#fff}
+.tab{border-radius:8px;font-weight:600}
+select,input[type=text],button.act{border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:8px;padding:6px 10px;font:inherit;font-size:13px}
+input[type=text]{flex:1;min-width:140px}button.act{cursor:pointer}button.act:disabled{opacity:.5}
+label.ck{font-size:13px;color:var(--mut);display:flex;align-items:center;gap:4px;cursor:pointer}
+.item{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;gap:10px;align-items:flex-start}
+.item .main{flex:1;min-width:0}
 .item a{color:var(--tx);text-decoration:none;font-weight:600}.item a:hover{color:var(--ac);text-decoration:underline}
-.sub{color:var(--mut);font-size:12.5px;margin-top:4px}.tag{color:var(--ac)}
+.sub{color:var(--mut);font-size:12.5px;margin-top:4px}.tag{color:var(--ac)}.loc{color:#1a7f4b;font-weight:600}
+.star{border:0;background:none;cursor:pointer;font-size:20px;line-height:1;color:var(--mut);padding:0 2px}
+.star.on{color:var(--star)}
 .err{background:#fde8e8;color:#9b1c1c;padding:8px 12px;border-radius:8px;margin-bottom:10px;font-size:13px}
+.empty{text-align:center;color:var(--mut);padding:40px}
 .sum{background:var(--card);border:1px solid var(--ac);border-radius:10px;padding:12px 16px;margin-bottom:16px}
 .sum h2{font-size:15px;margin:0 0 6px;display:flex;justify-content:space-between;align-items:center;gap:8px}
 .sum .body{font-size:14px}.sum ul{margin:6px 0 0;padding-left:20px}.sum li{margin:3px 0}.sum p{margin:0 0 4px}
+.sum details{margin-top:8px;font-size:13px}.sum summary{cursor:pointer;color:var(--mut)}
+.hist{border-top:1px solid var(--bd);margin-top:8px;padding-top:6px}
 .box{border:2px solid var(--ac);border-radius:12px;padding:10px 10px 2px;margin-bottom:10px;background:var(--card)}
 .box>.hd{font-size:13px;color:var(--ac);font-weight:700;margin:0 4px 8px}
 .box .item{border-color:var(--bd);background:var(--bg)}
-.empty{text-align:center;color:var(--mut);padding:40px}
+details.kw{margin-bottom:12px;font-size:13px}details.kw summary{cursor:pointer;color:var(--mut)}
 </style></head><body><div class="wrap">
-<h1>한수원 뉴스 스크랩</h1><div class="meta" id="meta">구글 뉴스에서 불러오는 중…</div>
+<h1>한수원 뉴스 스크랩</h1><div class="meta" id="meta">불러오는 중…</div>
+
 <div class="sum"><h2><span>주간 AI 요약 (최근 7일)</span><button class="act" id="sumbtn">요약 생성</button></h2>
-<div class="body" id="sumbody">버튼을 누르면 최근 7일 기사를 AI가 요약합니다.</div></div>
+<div class="body" id="sumbody">버튼을 누르면 최근 7일 기사를 AI가 요약합니다.</div>
+<label class="ck" style="margin-top:6px"><input type="checkbox" id="autosum"> 매주 처음 열 때 자동 요약 (이 브라우저에 보관)</label>
+<details><summary>지난 요약 보기 (<span id="hn">0</span>)</summary><div id="hist"></div></details></div>
+
+<details class="kw"><summary>검색 키워드 편집</summary>
+<div class="bar" style="margin-top:8px"><input type="text" id="kwin" placeholder="쉼표로 구분 (최대 8개)">
+<button class="act" id="kwok">적용</button><button class="act" id="kwreset">기본값</button></div></details>
+
+<div class="bar" id="tabs"></div>
 <div class="bar" id="chips"></div>
-<div class="bar"><input id="q" placeholder="결과 내 검색 (제목·언론사)">
+<div class="bar"><input type="text" id="q" placeholder="결과 내 검색 (제목·언론사)">
 <select id="days"><option value="1">최근 1일</option><option value="3">최근 3일</option><option value="7" selected>최근 7일</option><option value="30">최근 30일</option></select>
 <button class="act" id="re">새로고침</button></div>
+<div class="bar"><label class="ck"><input type="checkbox" id="nospam" checked> 스팸·광고 숨김 (<span id="sn">0</span>)</label>
+<label class="ck"><input type="checkbox" id="saeulfirst" checked> 새울 기사 우선</label>
+<span id="scrapbar" style="display:none;margin-left:auto"><button class="act" id="csv">CSV 내보내기</button> <button class="act" id="cp">목록 복사</button> <button class="act" id="clr">스크랩 비우기</button></span></div>
 <div id="errs"></div><div id="list"></div></div>
 <script>
-let data=null,active=new Set();
 const $=id=>document.getElementById(id);
-const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const store={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}},
+ set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+const DEFAULT_KW=['한국수력원자력','새울원자력본부','한수원','새울본부'];
+let data=null,active=new Set(),tab='all',cur=[];
+let kws=store.get('kws',DEFAULT_KW),scraps=store.get('scraps',{});
+const isSaeul=a=>/새울/.test(a.title)||a.kws.some(k=>/새울/.test(k));
+
 function ago(ts){const m=Math.floor((Date.now()/1000-ts)/60);if(m<1)return'방금 전';if(m<60)return m+'분 전';
  const h=Math.floor(m/60);if(h<24)return h+'시간 전';return Math.floor(h/24)+'일 전'}
 function fmt(ts){const d=new Date(ts*1000),p=n=>String(n).padStart(2,'0');
  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`}
-function render(){
- const q=$('q').value.trim().toLowerCase();
- const arts=data.articles.filter(a=>(!active.size||a.kws.some(k=>active.has(k)))&&
-  (!q||(a.title+a.source).toLowerCase().includes(q)));
- $('meta').textContent=`${data.fetched} 기준 · 전체 ${data.articles.length}건 · 표시 ${arts.length}건`;
- const card=a=>`<div class="item"><a href="${esc(a.link)}" target="_blank" rel="noopener">${esc(a.title)}</a>
- <div class="sub">${esc(a.source)} · ${fmt(a.ts)} (${ago(a.ts)}) · <span class="tag">${a.kws.map(esc).join(', ')}</span></div></div>`;
- const gs=new Map();arts.forEach(a=>{if(!gs.has(a.gid))gs.set(a.gid,[]);gs.get(a.gid).push(a)});
- $('list').innerHTML=arts.length?[...gs.values()].map(g=>g.length>1?
-  `<div class="box"><div class="hd">유사 기사 ${g.length}건 · 언론사 ${new Set(g.map(x=>x.source)).size}곳</div>${g.map(card).join('')}</div>`:card(g[0])).join(''):'<div class="empty">기사가 없습니다.</div>';
+
+/* ---------- 목록 ---------- */
+function card(a,i){const on=!!scraps[a.link];
+ return `<div class="item"><button class="star ${on?'on':''}" data-i="${i}" title="스크랩">${on?'★':'☆'}</button><div class="main">
+ <a href="${esc(a.link)}" target="_blank" rel="noopener">${esc(a.title)}</a>
+ <div class="sub">${a.local?'<span class="loc">'+esc(a.source)+'</span>':esc(a.source)} · ${fmt(a.ts)} (${ago(a.ts)})${a.kws?' · <span class="tag">'+a.kws.map(esc).join(', ')+'</span>':''}</div></div></div>`}
+function tabs(){
+ const n=Object.keys(scraps).length;
+ $('tabs').innerHTML=[['all','전체'],['saeul','새울'],['local','지역(울산뉴스넷·울주신문)'],['scrap','★ 스크랩 '+n]]
+  .map(([k,t])=>`<button class="tab ${tab===k?'on':''}" data-t="${k}">${t}</button>`).join('');
+ document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{tab=b.dataset.t;tabs();render()});
 }
+function render(){
+ $('scrapbar').style.display=tab==='scrap'?'':'none';
+ const q=$('q').value.trim().toLowerCase();
+ if(tab==='scrap'){
+  cur=Object.values(scraps).sort((a,b)=>b.ts-a.ts).filter(a=>!q||(a.title+a.source).toLowerCase().includes(q));
+  $('meta').textContent=`스크랩 ${cur.length}건 (이 브라우저에 저장됨)`;
+  $('list').innerHTML=cur.length?cur.map(card).join(''):'<div class="empty">☆를 눌러 기사를 스크랩하세요.</div>';return}
+ if(!data)return;
+ const hide=$('nospam').checked;
+ $('sn').textContent=data.articles.filter(a=>a.spam).length;
+ let arts=data.articles.filter(a=>(!hide||!a.spam)&&(!active.size||a.kws.some(k=>active.has(k)))&&
+  (!q||(a.title+a.source).toLowerCase().includes(q))&&(tab==='all'||(tab==='saeul'?isSaeul(a):a.local)));
+ const gs=new Map();arts.forEach(a=>{if(!gs.has(a.gid))gs.set(a.gid,[]);gs.get(a.gid).push(a)});
+ let groups=[...gs.values()];
+ if($('saeulfirst').checked&&tab==='all')groups.sort((x,y)=>(y.some(isSaeul)-x.some(isSaeul))||(y[0].ts-x[0].ts));
+ cur=[];let html='';
+ for(const g of groups){
+  const body=g.map(a=>{cur.push(a);return card(a,cur.length-1)}).join('');
+  html+=g.length>1?`<div class="box"><div class="hd">유사 기사 ${g.length}건 · 언론사 ${new Set(g.map(x=>x.source)).size}곳</div>${body}</div>`:body}
+ $('meta').textContent=`${data.fetched} 기준 · 전체 ${data.articles.length}건 · 표시 ${arts.length}건`;
+ $('list').innerHTML=html||'<div class="empty">기사가 없습니다.</div>';
+}
+$('list').onclick=e=>{const b=e.target.closest('.star');if(!b)return;const a=cur[+b.dataset.i];if(!a)return;
+ if(scraps[a.link])delete scraps[a.link];else scraps[a.link]={title:a.title,link:a.link,source:a.source,ts:a.ts};
+ store.set('scraps',scraps);tabs();render()};
 function chips(){
- $('chips').innerHTML=data.keywords.map(k=>`<button class="chip ${active.has(k)?'on':''}" data-k="${k}">${k}</button>`).join('');
+ $('chips').innerHTML=data.keywords.map(k=>`<button class="chip ${active.has(k)?'on':''}" data-k="${esc(k)}">${esc(k)}</button>`).join('');
  document.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{const k=b.dataset.k;active.has(k)?active.delete(k):active.add(k);chips();render()});
 }
 async function load(){
- $('meta').textContent='구글 뉴스에서 불러오는 중…';$('re').disabled=true;
- try{data=await (await fetch('/api/news?days='+$('days').value)).json();
-  $('errs').innerHTML=data.errors.map(e=>`<div class="err">${esc(e)}</div>`).join('');chips();render();
+ $('meta').textContent='불러오는 중…';$('re').disabled=true;
+ try{data=await (await fetch('/api/news?days='+$('days').value+'&kw='+encodeURIComponent(kws.join(',')))).json();
+  $('errs').innerHTML=data.errors.map(e=>`<div class="err">${esc(e)}</div>`).join('');
+  active=new Set([...active].filter(k=>data.keywords.includes(k)));chips();render();
  }catch(e){$('meta').textContent='불러오기 실패: '+e}
  $('re').disabled=false;
 }
-$('re').onclick=load;$('days').onchange=load;$('q').oninput=()=>data&&render();
+
+/* ---------- 스크랩 내보내기 ---------- */
+function scrapList(){return Object.values(scraps).sort((a,b)=>b.ts-a.ts)}
+$('csv').onclick=()=>{const q=s=>'"'+String(s).replace(/"/g,'""')+'"';
+ const rows=[['날짜','언론사','제목','링크'],...scrapList().map(a=>[fmt(a.ts),a.source,a.title,a.link])];
+ const blob=new Blob(['﻿'+rows.map(r=>r.map(q).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'});
+ const l=document.createElement('a');l.href=URL.createObjectURL(blob);l.download='news_scrap_'+new Date().toISOString().slice(0,10)+'.csv';l.click();URL.revokeObjectURL(l.href)};
+$('cp').onclick=async()=>{const t=scrapList().map(a=>`${a.title} (${a.source}, ${fmt(a.ts)})\n${a.link}`).join('\n\n');
+ try{await navigator.clipboard.writeText(t);$('cp').textContent='복사됨 ✓'}catch(e){$('cp').textContent='복사 실패'}
+ setTimeout(()=>$('cp').textContent='목록 복사',1500)};
+$('clr').onclick=()=>{if(confirm('스크랩을 모두 지울까요?')){scraps={};store.set('scraps',scraps);tabs();render()}};
+
+/* ---------- 키워드 편집 ---------- */
+$('kwin').value=kws.join(', ');
+$('kwok').onclick=()=>{const v=$('kwin').value.split(',').map(s=>s.trim()).filter(Boolean).slice(0,8);
+ if(!v.length)return;kws=v;store.set('kws',kws);load()};
+$('kwreset').onclick=()=>{kws=DEFAULT_KW.slice();$('kwin').value=kws.join(', ');store.set('kws',kws);load()};
+
+/* ---------- 주간 AI 요약 ---------- */
 function md(t){const e=esc(t).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');let o='',ul=false;
  for(const l of e.split(/\r?\n/)){if(/^\s*[-*] /.test(l)){if(!ul){o+='<ul>';ul=true}o+='<li>'+l.replace(/^\s*[-*] /,'')+'</li>'}
- else{if(ul){o+='</ul>';ul=false}if(l.trim())o+='<p>'+l+'</p>'}}return o+(ul?'</ul>':'')}
-$('sumbtn').onclick=async()=>{const b=$('sumbtn');b.disabled=true;$('sumbody').textContent='AI가 요약하는 중… (최대 1분)';
- try{const r=await (await fetch('/api/summary?days=7')).json();
-  $('sumbody').innerHTML=r.error?`<div class="err">${esc(r.error)}</div>`:md(r.summary)+`<div class="sub">${r.generated} 생성 · 기사 ${r.count}건 → ${r.groups}개 묶음 기준</div>`;
- }catch(e){$('sumbody').textContent='요약 실패: '+e}b.disabled=false;b.textContent='다시 요약'};
-load();
+ else{if(ul){o+='</ul>';ul=false}if(l.trim()&&!/^-{3,}$/.test(l.trim()))o+='<p>'+l+'</p>'}}return o+(ul?'</ul>':'')}
+function weekId(d=new Date()){const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));const n=t.getUTCDay()||7;
+ t.setUTCDate(t.getUTCDate()+4-n);const y=new Date(Date.UTC(t.getUTCFullYear(),0,1));return t.getUTCFullYear()+'-W'+Math.ceil(((t-y)/864e5+1)/7)}
+function histRender(){const h=store.get('sumhist',[]);$('hn').textContent=h.length;
+ $('hist').innerHTML=h.map(x=>`<div class="hist"><div class="sub">${esc(x.generated)} 생성 · ${esc(x.week)}</div><div class="body">${md(x.summary)}</div></div>`).join('')||'<div class="sub">아직 없습니다.</div>'}
+async function summarize(auto){
+ const b=$('sumbtn');b.disabled=true;$('sumbody').textContent='AI가 요약하는 중… (최대 1분)';
+ try{const r=await (await fetch('/api/summary?days=7&kw='+encodeURIComponent(kws.join(',')))).json();
+  if(r.error){$('sumbody').innerHTML=`<div class="err">${esc(r.error)}</div>`}
+  else{$('sumbody').innerHTML=md(r.summary)+`<div class="sub">${r.generated} 생성 · 기사 ${r.count}건 → ${r.groups}개 묶음 기준</div>`;
+   const h=store.get('sumhist',[]).filter(x=>x.week!==weekId()||x.generated!==r.generated);
+   h.unshift({week:weekId(),generated:r.generated,summary:r.summary});store.set('sumhist',h.slice(0,12));
+   store.set('sumweek',weekId());histRender();b.textContent='다시 요약'}
+ }catch(e){$('sumbody').textContent='요약 실패: '+e}
+ b.disabled=false}
+$('sumbtn').onclick=()=>summarize(false);
+$('autosum').checked=store.get('autosum',true);
+$('autosum').onchange=()=>store.set('autosum',$('autosum').checked);
+{const h=store.get('sumhist',[]);if(h.length){$('sumbody').innerHTML=md(h[0].summary)+`<div class="sub">${esc(h[0].generated)} 생성 (저장된 요약)</div>`;$('sumbtn').textContent='다시 요약'}}
+histRender();
+
+$('re').onclick=load;$('days').onchange=load;$('q').oninput=render;
+$('nospam').onchange=render;$('saeulfirst').onchange=render;
+tabs();
+load().then(()=>{if($('autosum').checked&&store.get('sumweek','')!==weekId())summarize(true)});
 </script></body></html>
