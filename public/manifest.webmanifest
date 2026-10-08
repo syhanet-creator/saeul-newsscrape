@@ -1,0 +1,25 @@
+{
+  "id": "/",
+  "name": "한수원 뉴스 스크랩",
+  "short_name": "한수원뉴스",
+  "description": "한수원 · 새울본부 보도와 울산 지역 언론을 한눈에",
+  "lang": "ko",
+  "dir": "ltr",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#06305f",
+  "theme_color": "#06305f",
+  "categories": ["news"],
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "새울 기사", "short_name": "새울", "url": "/?tab=saeul&source=shortcut", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "지역신문", "short_name": "지역", "url": "/?tab=local&source=shortcut", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "내 스크랩", "short_name": "스크랩", "url": "/?tab=scrap&source=shortcut", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

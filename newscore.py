@@ -62,6 +62,7 @@ def fetch_google(kw, days):
 NOT_NAMES = {"울주신문", "울산뉴스넷", "울산매일", "울산신문", "경상일보", "울산제일일보", "울산종합일보", "울산시민신문",
              "관리자", "편집부", "편집국", "보도자료", "취재", "담당", "본지", "현장", "사진", "영상", "수습", "인턴", "선임",
              "사회", "정치", "경제", "문화", "지역", "온라인"}
+OUTLET_SUFFIX = ("일보", "신문", "뉴스", "방송", "미디어", "저널", "투데이", "타임스", "데일리", "경제", "통신", "닷컴", "넷")
 BYLINE_RE = re.compile(r"([가-힣]{2,4})\s*(?:기자|PD|논설위원|대기자|편집위원)")
 
 
@@ -70,7 +71,8 @@ def clean_author(s):
     s = html.unescape(re.sub(r"<[^>]+>", "", s or ""))
     m = BYLINE_RE.search(s)
     name = m.group(1) if m else re.sub(r"[^가-힣]", "", s)
-    if not (2 <= len(name) <= 4) or name in NOT_NAMES or name.endswith(("부", "팀", "국", "실")):
+    if (not (2 <= len(name) <= 4) or name in NOT_NAMES or name.endswith(("부", "팀", "국", "실"))
+            or name.endswith(OUTLET_SUFFIX)):
         return ""
     return name
 
@@ -294,8 +296,100 @@ def cluster(arts):
         a["gid"] = find(i)
 
 
+GN_LINK = "https://news.google.com/rss/articles/"
+_BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
+
+
+def resolve_google(link, timeout=10):
+    """구글 뉴스 기사 링크 -> 원문 주소. 구글의 기사 변환 요청(batchexecute)을 쓴다. 실패하면 ''."""
+    if not link.startswith(GN_LINK):
+        return ""
+    gid = link[len(GN_LINK):].split("?")[0]
+    hdr = {"User-Agent": _BROWSER_UA}
+    page = urllib.request.urlopen(
+        urllib.request.Request(f"https://news.google.com/articles/{gid}", headers=hdr), timeout=timeout).read().decode("utf-8", "replace")
+    sg, ts = re.search(r'data-n-a-sg="([^"]+)"', page), re.search(r'data-n-a-ts="([^"]+)"', page)
+    if not (sg and ts):
+        return ""
+    inner = json.dumps(["garturlreq", [["X", "X", ["X", "X"], None, None, 1, 1, "US:en", None, 1, None, None, None, None,
+                                        None, 0, 1], "X", "X", 1, [1, 1, 1], 1, 1, None, 0, 0, None, 0], gid, int(ts.group(1)), sg.group(1)])
+    body = urllib.parse.urlencode({"f.req": json.dumps([[["Fbv4je", inner, None, "generic"]]])}).encode()
+    req = urllib.request.Request("https://news.google.com/_/DotsSplashUi/data/batchexecute", data=body,
+                                 headers={**hdr, "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"})
+    res = urllib.request.urlopen(req, timeout=timeout).read().decode("utf-8", "replace")
+    m = re.search(r'garturlres.{0,6}?(https?:[^"\\]+)', res)
+    return m.group(1) if m else ""
+
+
+_META_AUTH = re.compile(
+    r'<meta[^>]+(?:property|name)=["\'](?:dable:author|og:article:author|article:author|author|byline|twitter:creator)["\'][^>]*>', re.I)
+_LD_AUTH = re.compile(r'"author"\s*:\s*(?:\[\s*)?\{[^}]*?"name"\s*:\s*"([^"]+)"')
+_TAG = re.compile(r"<(script|style|noscript)[^>]*>.*?</\1>|<[^>]+>", re.S | re.I)
+
+
+def page_author(page):
+    """기사 HTML 에서 기자 이름을 찾는다: ① 메타 태그 ② JSON-LD ③ 제목 아래 바이라인('홍길동 기자')."""
+    for m in _META_AUTH.finditer(page):
+        c = re.search(r'content=["\']([^"\']*)["\']', m.group(0))
+        name = clean_author(c.group(1)) if c else ""
+        if name:
+            return name
+    for m in _LD_AUTH.finditer(page):
+        name = clean_author(m.group(1))
+        if name:
+            return name
+    h1 = re.search(r"<h1", page)
+    start = h1.start() if h1 else 0
+    text = html.unescape(_TAG.sub(" ", page[start:start + 20000]))
+    for m in BYLINE_RE.finditer(text[:1500]):  # 제목 바로 아래 영역
+        name = clean_author(m.group(0))
+        if name:
+            return name
+    return ""
+
+
 _authors = {}  # 기사 링크 -> 기자 이름(본문 페이지에서 읽은 결과를 서버가 켜져 있는 동안 기억한다)
 _AUTHOR_META = re.compile(r'property="(?:dable:author|og:article:author)"\s*content="([^"]*)"')
+
+
+_gn_block = {"until": 0.0}  # 구글이 429 로 막으면 이 시각까지 구글 요청을 하지 않는다
+_gn_last = {"t": 0.0}
+_gn_lock = threading.Lock()
+
+
+def author_for_google(link):
+    """구글 뉴스 링크 -> (기자 이름, 상태). 상태: ok(이름이 비어 있을 수 있음) / blocked / fail.
+    구글에는 한 서버 안에서 순서대로, 최소 1.2초 간격으로만 요청하고 429 를 받으면 2분간 멈춘다."""
+    if link in _authors:
+        return _authors[link], "ok"
+    if time.time() < _gn_block["until"]:
+        return "", "blocked"
+    with _gn_lock:
+        wait = 1.2 - (time.time() - _gn_last["t"])
+        if wait > 0:
+            time.sleep(wait)
+        try:
+            url = resolve_google(link)
+        except urllib.error.HTTPError as e:
+            _gn_last["t"] = time.time()
+            if e.code == 429:
+                _gn_block["until"] = time.time() + 120
+                return "", "blocked"
+            return "", "fail"
+        except Exception:
+            _gn_last["t"] = time.time()
+            return "", "fail"
+        _gn_last["t"] = time.time()
+    if not url:
+        return "", "fail"
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": _BROWSER_UA})
+        with urllib.request.urlopen(req, timeout=10) as r:
+            page = r.read(400000).decode("utf-8", "replace")
+    except Exception:
+        return "", "fail"
+    _authors[link] = page_author(page)
+    return _authors[link], "ok"
 
 
 def _article_author(link):
