@@ -16,9 +16,17 @@ input{flex:1;min-width:140px}button.act{cursor:pointer}
 .item a{color:var(--tx);text-decoration:none;font-weight:600}.item a:hover{color:var(--ac);text-decoration:underline}
 .sub{color:var(--mut);font-size:12.5px;margin-top:4px}.tag{color:var(--ac)}
 .err{background:#fde8e8;color:#9b1c1c;padding:8px 12px;border-radius:8px;margin-bottom:10px;font-size:13px}
+.sum{background:var(--card);border:1px solid var(--ac);border-radius:10px;padding:12px 16px;margin-bottom:16px}
+.sum h2{font-size:15px;margin:0 0 6px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.sum .body{font-size:14px}.sum ul{margin:6px 0 0;padding-left:20px}.sum li{margin:3px 0}.sum p{margin:0 0 4px}
+.box{border:2px solid var(--ac);border-radius:12px;padding:10px 10px 2px;margin-bottom:10px;background:var(--card)}
+.box>.hd{font-size:13px;color:var(--ac);font-weight:700;margin:0 4px 8px}
+.box .item{border-color:var(--bd);background:var(--bg)}
 .empty{text-align:center;color:var(--mut);padding:40px}
 </style></head><body><div class="wrap">
 <h1>한수원 뉴스 스크랩</h1><div class="meta" id="meta">구글 뉴스에서 불러오는 중…</div>
+<div class="sum"><h2><span>주간 AI 요약 (최근 7일)</span><button class="act" id="sumbtn">요약 생성</button></h2>
+<div class="body" id="sumbody">버튼을 누르면 최근 7일 기사를 AI가 요약합니다.</div></div>
 <div class="bar" id="chips"></div>
 <div class="bar"><input id="q" placeholder="결과 내 검색 (제목·언론사)">
 <select id="days"><option value="1">최근 1일</option><option value="3">최근 3일</option><option value="7" selected>최근 7일</option><option value="30">최근 30일</option></select>
@@ -37,8 +45,11 @@ function render(){
  const arts=data.articles.filter(a=>(!active.size||a.kws.some(k=>active.has(k)))&&
   (!q||(a.title+a.source).toLowerCase().includes(q)));
  $('meta').textContent=`${data.fetched} 기준 · 전체 ${data.articles.length}건 · 표시 ${arts.length}건`;
- $('list').innerHTML=arts.length?arts.map(a=>`<div class="item"><a href="${esc(a.link)}" target="_blank" rel="noopener">${esc(a.title)}</a>
- <div class="sub">${esc(a.source)} · ${fmt(a.ts)} (${ago(a.ts)}) · <span class="tag">${a.kws.map(esc).join(', ')}</span></div></div>`).join(''):'<div class="empty">기사가 없습니다.</div>';
+ const card=a=>`<div class="item"><a href="${esc(a.link)}" target="_blank" rel="noopener">${esc(a.title)}</a>
+ <div class="sub">${esc(a.source)} · ${fmt(a.ts)} (${ago(a.ts)}) · <span class="tag">${a.kws.map(esc).join(', ')}</span></div></div>`;
+ const gs=new Map();arts.forEach(a=>{if(!gs.has(a.gid))gs.set(a.gid,[]);gs.get(a.gid).push(a)});
+ $('list').innerHTML=arts.length?[...gs.values()].map(g=>g.length>1?
+  `<div class="box"><div class="hd">유사 기사 ${g.length}건 · 언론사 ${new Set(g.map(x=>x.source)).size}곳</div>${g.map(card).join('')}</div>`:card(g[0])).join(''):'<div class="empty">기사가 없습니다.</div>';
 }
 function chips(){
  $('chips').innerHTML=data.keywords.map(k=>`<button class="chip ${active.has(k)?'on':''}" data-k="${k}">${k}</button>`).join('');
@@ -52,5 +63,12 @@ async function load(){
  $('re').disabled=false;
 }
 $('re').onclick=load;$('days').onchange=load;$('q').oninput=()=>data&&render();
+function md(t){const e=esc(t).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');let o='',ul=false;
+ for(const l of e.split(/\r?\n/)){if(/^\s*[-*] /.test(l)){if(!ul){o+='<ul>';ul=true}o+='<li>'+l.replace(/^\s*[-*] /,'')+'</li>'}
+ else{if(ul){o+='</ul>';ul=false}if(l.trim())o+='<p>'+l+'</p>'}}return o+(ul?'</ul>':'')}
+$('sumbtn').onclick=async()=>{const b=$('sumbtn');b.disabled=true;$('sumbody').textContent='AI가 요약하는 중… (10~30초)';
+ try{const r=await (await fetch('/api/summary?days=7')).json();
+  $('sumbody').innerHTML=r.error?`<div class="err">${esc(r.error)}</div>`:md(r.summary)+`<div class="sub">${r.generated} 생성 · 기사 ${r.count}건 → ${r.groups}개 묶음 기준</div>`;
+ }catch(e){$('sumbody').textContent='요약 실패: '+e}b.disabled=false;b.textContent='다시 요약'};
 load();
 </script></body></html>

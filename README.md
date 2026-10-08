@@ -10,3 +10,9 @@ python news_scrap.py
 
 - Python 3 표준 라이브러리만 사용 (설치 불필요)
 - 키워드는 `news_scrap.py`의 `KEYWORDS`에서 수정
+
+## 기능
+- 유사 기사 묶기: 제목 유사도로 같은 사안의 기사를 네모 상자로 묶어 표시
+- 주간 AI 요약: 최근 7일 기사를 Claude로 요약 (버튼 클릭 시에만 호출, 30분 캐시)
+  - 환경변수 `ANTHROPIC_API_KEY` 필요 (로컬: `$env:ANTHROPIC_API_KEY="sk-ant-..."` 후 실행 / Vercel: Project Settings → Environment Variables)
+  - 모델 변경: `SUMMARY_MODEL` (기본 claude-haiku-4-5-20251001)
