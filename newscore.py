@@ -373,28 +373,32 @@ _bing_lock = threading.Lock()
 def bing_find_url(title):
     """같은 제목의 기사를 빙 뉴스 RSS 에서 찾아 원문 주소를 돌려준다(제목 유사도 0.6 이상). 없으면 ''.
     빙 링크에는 원문 주소가 그대로 들어 있어 구글처럼 주소를 풀 필요가 없다. msn.com 모아보기 링크는 제외한다."""
-    q = re.sub(r"[“”\"'‘’]", "", title).strip()
-    if not q:
-        return ""
-    with _bing_lock:  # 한 서버에서는 순서대로, 0.4초 이상 간격
-        wait = 0.4 - (time.time() - _bing_last["t"])
-        if wait > 0:
-            time.sleep(wait)
-        _bing_last["t"] = time.time()
-    u = ("https://www.bing.com/news/search?q=" + urllib.parse.quote(q) + "&format=rss&setmkt=ko-KR&setlang=ko")
-    root = ET.fromstring(urllib.request.urlopen(
-        urllib.request.Request(u, headers={"User-Agent": _BROWSER_UA}), timeout=10).read())
+    clean = re.sub(r"[^0-9A-Za-z가-힣\s]", " ", title)
+    clean = re.sub(r"\s+", " ", clean).strip()
+    # 검색어 두 가지: 제목 앞 25자(시험에서 일치율이 가장 높았다) -> 못 찾으면 제목 전체
+    queries = [q for q in dict.fromkeys([clean[:25].strip(), clean]) if q]
     g = _grams(title)
-    best_sim, best = 0.0, ""
-    for it in root.iter("item"):
-        real = urllib.parse.parse_qs(urllib.parse.urlparse(it.findtext("link") or "").query).get("url", [""])[0]
-        if not real or "msn.com" in real or "bing.com" in real:
-            continue
-        gg = _grams(it.findtext("title") or "")
-        sim = len(g & gg) / max(1, len(g | gg))
-        if sim > best_sim:
-            best_sim, best = sim, real
-    return best if best_sim >= 0.6 else ""
+    for q in queries:
+        with _bing_lock:  # 한 서버에서는 순서대로, 0.4초 이상 간격
+            wait = 0.4 - (time.time() - _bing_last["t"])
+            if wait > 0:
+                time.sleep(wait)
+            _bing_last["t"] = time.time()
+        u = "https://www.bing.com/news/search?q=" + urllib.parse.quote(q) + "&format=rss&setmkt=ko-KR&setlang=ko"
+        root = ET.fromstring(urllib.request.urlopen(
+            urllib.request.Request(u, headers={"User-Agent": _BROWSER_UA}), timeout=10).read())
+        best_sim, best = 0.0, ""
+        for it in root.iter("item"):
+            real = urllib.parse.parse_qs(urllib.parse.urlparse(it.findtext("link") or "").query).get("url", [""])[0]
+            if not real or "msn.com" in real or "bing.com" in real:
+                continue
+            gg = _grams(it.findtext("title") or "")
+            sim = len(g & gg) / max(1, len(g | gg))
+            if sim > best_sim:
+                best_sim, best = sim, real
+        if best_sim >= 0.5:
+            return best
+    return ""
 
 
 def author_for_article(link, title):
