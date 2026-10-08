@@ -318,25 +318,26 @@ $('q').placeholder='결과 내 검색 (제목·언론사·기자)';
 $('nospam').onchange=render;$('saeulfirst').onchange=render;
 /* ---------- 구글 뉴스 기사의 기자 이름: 한 건씩 천천히 채운다 ---------- */
 const GN='https://news.google.com/rss/articles/';
-let authMap=store.get('auth2',{}),authBusy=false,authPausedUntil=0;const authFailed=new Set();
-function applyAuthors(){if(!data)return;data.articles.forEach(a=>{if(!a.author&&authMap[a.link])a.author=authMap[a.link]})}
+let authMap=store.get('auth3',{}),authBusy=false,authPausedUntil=0;const authFailed=new Set();
+const sameAsOutlet=(a,n)=>!n||a.source.replace(/\s/g,'').includes(n)||n.includes(a.source.replace(/\s/g,''));
+function applyAuthors(){if(!data)return;data.articles.forEach(a=>{if(a.author&&sameAsOutlet(a,a.author))a.author='';if(!a.author&&authMap[a.link]&&!sameAsOutlet(a,authMap[a.link]))a.author=authMap[a.link]})}
 async function fetchAuthors(){
  if(authBusy||!data||Date.now()<authPausedUntil)return;authBusy=true;let changed=0,n=0;
  try{
   const todo=data.articles.filter(a=>!a.local&&!a.spam&&!a.author&&a.link.startsWith(GN)&&!(a.link in authMap)&&!authFailed.has(a.link));
   for(const a of todo){
    if(n++>=25||!data)break;const t0=Date.now();let r;
-   try{r=await (await fetch('/api/author?v=2&u='+encodeURIComponent(a.link))).json()}catch(e){break}
+   try{r=await (await fetch('/api/author?v=3&u='+encodeURIComponent(a.link))).json()}catch(e){break}
    if(r.status==='blocked'){authPausedUntil=Date.now()+180000;break}   /* 구글이 막으면 3분 쉰다 */
    if(r.status!=='ok'){authFailed.add(a.link);continue}
    authMap[a.link]=r.author||'';
-   if(r.author){data.articles.forEach(x=>{if(x.link===a.link)x.author=r.author});if(++changed%4===0)render()}
+   if(r.author&&!sameAsOutlet(a,r.author)){data.articles.forEach(x=>{if(x.link===a.link)x.author=r.author});if(++changed%4===0)render()}
    await new Promise(res=>setTimeout(res,Date.now()-t0<600?120:1500));   /* 캐시에서 온 건 빠르게, 아니면 천천히 */
   }
  }finally{
   authBusy=false;if(changed)render();
   const ks=Object.keys(authMap);if(ks.length>3000)authMap=Object.fromEntries(ks.slice(-2000).map(k=>[k,authMap[k]]));
-  store.set('auth2',authMap)}
+  store.set('auth3',authMap)}
 }
 
 /* ---------- PWA: 서비스 워커·설치 버튼·바로가기 ---------- */
