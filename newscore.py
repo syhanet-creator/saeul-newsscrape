@@ -383,13 +383,61 @@ def author_for_google(link):
     if not url:
         return "", "fail"
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": _BROWSER_UA})
-        with urllib.request.urlopen(req, timeout=10) as r:
-            page = r.read(400000).decode("utf-8", "replace")
+        page = _get_page(url)
     except Exception:
         return "", "fail"
-    _authors[link] = page_author(page)
-    return _authors[link], "ok"
+    name = page_author(page)
+    if not name:
+        # 구글이 알려 준 주소가 AMP·모바일 버전이면 기자 이름이 빠져 있다 -> 원래(canonical) 기사 주소로 한 번 더.
+        canon = _canonical(page, url)
+        if canon:
+            try:
+                name = page_author(_get_page(canon, timeout=8))
+            except Exception:
+                pass
+    _authors[link] = name
+    return name, "ok"
+
+
+def debug_google(link):
+    """(임시) 구글 링크가 어떤 주소로 풀리고 그 페이지를 서버가 어떻게 받는지 보여 준다."""
+    out = {}
+    try:
+        out["url"] = resolve_google(link)
+        if out["url"]:
+            req = urllib.request.Request(out["url"], headers={"User-Agent": _BROWSER_UA})
+            with urllib.request.urlopen(req, timeout=10) as r:
+                out["http"] = r.status
+                out["final"] = r.geturl()
+                raw = r.read(400000).decode("utf-8", "replace")
+            out["len"] = len(raw)
+            out["title"] = (re.search(r"<title[^>]*>(.*?)</title>", raw, re.S) or [None, ""])[1].strip()[:80]
+            out["has_h1"] = "<h1" in raw
+            out["author"] = page_author(raw)
+            out["canonical"] = _canonical(raw, out["url"])
+            out["meta"] = [m.group(0)[:90] for m in _META_AUTH.finditer(raw)][:3]
+            out["byline"] = [m.group(0) for m in BYLINE_RE.finditer(html.unescape(_TAG.sub(" ", raw)))][:3]
+    except Exception as e:
+        out["error"] = f"{type(e).__name__}: {str(e)[:80]}"
+    return out
+
+
+def _get_page(url, timeout=10):
+    req = urllib.request.Request(url, headers={"User-Agent": _BROWSER_UA})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return r.read(400000).decode("utf-8", "replace")
+
+
+def _canonical(page, url):
+    """페이지의 <link rel="canonical"> 주소. 없으면 AMP 주소 규칙(…Amp.html, /amp/)을 되돌려 본다."""
+    for m in re.finditer(r"<link\b[^>]*>", page, re.I):
+        tag = m.group(0)
+        if re.search(r'rel=["\']canonical["\']', tag, re.I):
+            h = re.search(r'href=["\']([^"\']+)["\']', tag)
+            if h and h.group(1) != url:
+                return urllib.parse.urljoin(url, html.unescape(h.group(1)))
+    guess = url.replace("articleViewAmp.html", "articleView.html").replace("/amp/", "/").replace("view_amp.html", "view.html")
+    return guess if guess != url else ""
 
 
 def _article_author(link):
