@@ -420,7 +420,7 @@ def author_for_article(link, title, domain=""):
     출처 = mem(서버가 이미 알고 있어 외부에 묻지 않음) / bing / google (화면이 '느린 조회'를 세는 데 쓴다)"""
     if link in _authors:
         return _authors[link], "ok", "mem"
-    if time.time() - _fails.get(link, 0) < 1800:  # 방금 실패한 기사는 30분간 다시 묻지 않는다
+    if time.time() - _fails.get(link, 0) < 300:  # 방금 실패한 기사는 5분간 다시 묻지 않는다
         return "", "fail", "mem"
     bing_blocked = time.time() < _bing_block["until"]
     if title and not bing_blocked:
