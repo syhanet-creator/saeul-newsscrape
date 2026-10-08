@@ -58,8 +58,25 @@ def fetch_google(kw, days):
     return items
 
 
+# ---------- 기자 이름 ----------
+NOT_NAMES = {"울주신문", "울산뉴스넷", "울산매일", "울산신문", "경상일보", "울산제일일보", "울산종합일보", "울산시민신문",
+             "관리자", "편집부", "편집국", "보도자료", "취재", "담당", "본지", "현장", "사진", "영상", "수습", "인턴", "선임",
+             "사회", "정치", "경제", "문화", "지역", "온라인"}
+BYLINE_RE = re.compile(r"([가-힣]{2,4})\s*(?:기자|PD|논설위원|대기자|편집위원)")
+
+
+def clean_author(s):
+    """'이두영 기자 |' 같은 문자열에서 이름만 남긴다. 신문사 이름·부서명이면 빈 문자열."""
+    s = html.unescape(re.sub(r"<[^>]+>", "", s or ""))
+    m = BYLINE_RE.search(s)
+    name = m.group(1) if m else re.sub(r"[^가-힣]", "", s)
+    if not (2 <= len(name) <= 4) or name in NOT_NAMES or name.endswith(("부", "팀", "국", "실")):
+        return ""
+    return name
+
+
 ULSAN_BOX = re.compile(
-    r"<dt><a href='(/\d+)'>(.*?)</a></dt>.*?class='etc'>.*?(\d{4}\.\d\d\.\d\d \d\d:\d\d)", re.S)
+    r"<dt><a href='(/\d+)'>(.*?)</a></dt>(.*?)class='etc'>(.*?)(\d{4}\.\d\d\.\d\d \d\d:\d\d)", re.S)
 
 
 def local_paper(name, base):
@@ -72,20 +89,22 @@ def local_paper(name, base):
             page = r.read().decode("utf-8", "replace")
         limit = time.time() - days * 86400
         items = []
-        for path, title, when in ULSAN_BOX.findall(page):
+        for path, title, lead, pre, when in ULSAN_BOX.findall(page):
             ts = datetime.strptime(when, "%Y.%m.%d %H:%M").replace(tzinfo=KST).timestamp()
             if ts < limit:
                 continue
             title = html.unescape(re.sub(r"<[^>]+>", "", title)).strip()
+            # 이름 칸이 신문사 이름이면 본문 앞머리의 '[울주신문=김정대기자]' 에서 읽는다.
+            author = clean_author(pre) or clean_author(lead[:200])
             items.append({"title": title, "link": base + path, "source": name,
-                          "ts": ts, "local": True})
+                          "ts": ts, "local": True, "author": author})
         return items
     return fetch
 
 
 UCI_ROW = re.compile(
     r'<a href="(/news/articleView\.html\?idxno=\d+)" class="links"><strong>(.*?)</strong></a>.*?'
-    r'class="list-dated[^"]*">[^<]*?(\d{4}-\d\d-\d\d \d\d:\d\d)', re.S)
+    r'class="list-dated[^"]*">([^<]*?)(\d{4}-\d\d-\d\d \d\d:\d\d)', re.S)
 
 
 def fetch_ucinews(kw, days):
@@ -98,11 +117,12 @@ def fetch_ucinews(kw, days):
         page = r.read().decode("utf-8", "replace")
     limit = time.time() - days * 86400
     items = []
-    for path, title, when in UCI_ROW.findall(page):
+    for path, title, pre, when in UCI_ROW.findall(page):
         ts = datetime.strptime(when, "%Y-%m-%d %H:%M").replace(tzinfo=KST).timestamp()
         if ts >= limit:
             items.append({"title": html.unescape(re.sub(r"<[^>]+>", "", title)).strip(),
-                          "link": base + path, "source": "울산시민신문", "ts": ts, "local": True})
+                          "link": base + path, "source": "울산시민신문", "ts": ts, "local": True,
+                          "author": clean_author(pre)})
     return items
 
 
@@ -122,7 +142,8 @@ def _iusm_feed():
             except Exception:
                 continue
             items.append({"title": (it.findtext("title") or "").strip(), "desc": it.findtext("description") or "",
-                          "link": (it.findtext("link") or "").strip(), "ts": ts})
+                          "link": (it.findtext("link") or "").strip(), "ts": ts,
+                          "author": clean_author(it.findtext("author"))})
         _iusm.update(t=time.time(), items=items)
     return _iusm["items"]
 
@@ -130,7 +151,8 @@ def _iusm_feed():
 def fetch_iusm(kw, days):
     """울산매일: 사이트 검색이 동작하지 않아 전체기사 RSS(최근 50건)에서 키워드가 든 기사만 고른다."""
     limit = time.time() - days * 86400
-    return [{"title": html.unescape(a["title"]), "link": a["link"], "source": "울산매일", "ts": a["ts"], "local": True}
+    return [{"title": html.unescape(a["title"]), "link": a["link"], "source": "울산매일", "ts": a["ts"], "local": True,
+             "author": a["author"]}
             for a in _iusm_feed() if a["ts"] >= limit and (kw in a["title"] or kw in a["desc"])]
 
 
@@ -152,11 +174,14 @@ def parse_cms_list(page, base):
         aid = _art_id(href)
         nxt = next((a[0] for a in anchors[i + 1:] if _art_id(a[2]) != aid), min(len(page), e + 900))
         d = DATE_RE.search(page[e:min(nxt, e + 900)])
-        rec = found.setdefault(aid, {"href": href, "title": "", "date": None})
+        rec = found.setdefault(aid, {"href": href, "title": "", "date": None, "author": ""})
         if len(text) >= 8 and not rec["title"]:
             rec["title"] = html.unescape(text)
         if d and not rec["date"]:
             rec["date"] = d
+        if not rec["author"]:  # 링크 뒤쪽(다음 기사 전)에서 '홍길동 기자' 형태를 찾는다.
+            by = BYLINE_RE.search(re.sub(r"<[^>]+>", " ", page[e:min(nxt, e + 900)]))
+            rec["author"] = clean_author(by.group(0)) if by else ""
     items = []
     for rec in found.values():
         d = rec["date"]
@@ -164,7 +189,8 @@ def parse_cms_list(page, base):
             continue
         y, mo, da, hh, mi = d.groups()
         ts = datetime(int(y), int(mo), int(da), int(hh or 0), int(mi or 0), tzinfo=KST).timestamp()
-        items.append({"title": rec["title"], "link": urllib.parse.urljoin(base + "/", rec["href"].replace("&amp;", "&")), "ts": ts})
+        items.append({"title": rec["title"], "link": urllib.parse.urljoin(base + "/", rec["href"].replace("&amp;", "&")),
+                      "ts": ts, "author": rec["author"]})
     return items
 
 
@@ -268,6 +294,39 @@ def cluster(arts):
         a["gid"] = find(i)
 
 
+_authors = {}  # 기사 링크 -> 기자 이름(본문 페이지에서 읽은 결과를 서버가 켜져 있는 동안 기억한다)
+_AUTHOR_META = re.compile(r'property="(?:dable:author|og:article:author)"\s*content="([^"]*)"')
+
+
+def _article_author(link):
+    """기사 본문 페이지 앞부분의 author 메타 태그에서 기자 이름을 읽는다."""
+    if link in _authors:
+        return _authors[link]
+    name = ""
+    try:
+        req = urllib.request.Request(link, headers={"User-Agent": UA})
+        with urllib.request.urlopen(req, timeout=6) as r:
+            head = r.read(60000).decode("utf-8", "replace")
+        for m in _AUTHOR_META.finditer(head):
+            name = clean_author(m.group(1))
+            if name:
+                break
+    except Exception:
+        pass
+    _authors[link] = name
+    return name
+
+
+def fill_authors(arts, limit=30):
+    """목록에서 기자 이름을 못 얻은 지역 기사만 본문 페이지로 보충한다(최신순, 한 번에 limit건까지)."""
+    need = sorted((a for a in arts if a.get("local") and not a["author"]), key=lambda a: -a["ts"])
+    fresh = [a for a in need if a["link"] not in _authors][:limit]
+    with ThreadPoolExecutor(6) as ex:
+        list(ex.map(lambda a: _article_author(a["link"]), fresh))
+    for a in need:
+        a["author"] = _authors.get(a["link"], "")
+
+
 def collect(days, kws=None, fast=False):
     """fast=True 면 구글 뉴스만(빠른 첫 화면), 아니면 지역 신문까지."""
     sources = SOURCES[:1] if fast else SOURCES
@@ -285,11 +344,14 @@ def collect(days, kws=None, fast=False):
                 else:
                     a["kws"] = [kw]
                     a["spam"] = is_spam(a)
+                    a.setdefault("author", "")
                     a.setdefault("local", False)
                     merged[key] = a
         except Exception as e:
             failed.setdefault(name, f"{name}: 응답이 느려 일부 결과가 빠졌을 수 있습니다")
     arts = sorted(merged.values(), key=lambda a: a["ts"], reverse=True)
+    if not fast:
+        fill_authors(arts)
     cluster(arts)
     return {"articles": arts, "errors": list(failed.values()), "keywords": kws,
             "fetched": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
