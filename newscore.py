@@ -361,6 +361,71 @@ _authors = {}  # 기사 링크 -> 기자 이름(본문 페이지에서 읽은 �
 _AUTHOR_META = re.compile(r'property="(?:dable:author|og:article:author)"\s*content="([^"]*)"')
 
 
+_bing_last = {"t": 0.0}
+_bing_block = {"until": 0.0}
+_bing_lock = threading.Lock()
+
+
+def bing_find_url(title):
+    """같은 제목의 기사를 빙 뉴스 RSS 에서 찾아 원문 주소를 돌려준다(제목 유사도 0.6 이상). 없으면 ''.
+    빙 링크에는 원문 주소가 그대로 들어 있어 구글처럼 주소를 풀 필요가 없다. msn.com 모아보기 링크는 제외한다."""
+    q = re.sub(r"[“”\"'‘’]", "", title).strip()
+    if not q:
+        return ""
+    with _bing_lock:  # 한 서버에서는 순서대로, 0.4초 이상 간격
+        wait = 0.4 - (time.time() - _bing_last["t"])
+        if wait > 0:
+            time.sleep(wait)
+        _bing_last["t"] = time.time()
+    u = ("https://www.bing.com/news/search?q=" + urllib.parse.quote(q) + "&format=rss&setmkt=ko-KR&setlang=ko")
+    root = ET.fromstring(urllib.request.urlopen(
+        urllib.request.Request(u, headers={"User-Agent": _BROWSER_UA}), timeout=10).read())
+    g = _grams(title)
+    best_sim, best = 0.0, ""
+    for it in root.iter("item"):
+        real = urllib.parse.parse_qs(urllib.parse.urlparse(it.findtext("link") or "").query).get("url", [""])[0]
+        if not real or "msn.com" in real or "bing.com" in real:
+            continue
+        gg = _grams(it.findtext("title") or "")
+        sim = len(g & gg) / max(1, len(g | gg))
+        if sim > best_sim:
+            best_sim, best = sim, real
+    return best if best_sim >= 0.6 else ""
+
+
+def author_for_article(link, title):
+    """기자 이름 조회. ① 빙에서 같은 제목의 기사를 찾아 그 원문에서 읽는다 ② 못 찾으면 구글 링크를 풀어서 읽는다.
+    반환: (이름, 상태) 상태 = ok(이름이 비어 있을 수 있음) / blocked(구글·빙 모두 막힘) / fail"""
+    if link in _authors:
+        return _authors[link], "ok"
+    bing_blocked = time.time() < _bing_block["until"]
+    if title and not bing_blocked:
+        try:
+            url = bing_find_url(title)
+            if url:
+                page = _get_page(url)
+                name = page_author(page)
+                if not name:
+                    canon = _canonical(page, url)
+                    if canon:
+                        try:
+                            name = page_author(_get_page(canon, timeout=8))
+                        except Exception:
+                            pass
+                _authors[link] = name
+                return name, "ok"
+        except urllib.error.HTTPError as e:
+            if e.code in (429, 503):
+                _bing_block["until"] = time.time() + 60
+                bing_blocked = True
+        except Exception:
+            pass
+    name, status = author_for_google(link)
+    if status == "blocked" and not bing_blocked:
+        return "", "fail"  # 구글만 막힘: 빙은 계속 쓸 수 있으니 이 기사만 건너뛴다
+    return name, status
+
+
 _gn_block = {"until": 0.0}  # 구글이 429 로 막으면 이 시각까지 구글 요청을 하지 않는다
 _gn_last = {"t": 0.0}
 _gn_lock = threading.Lock()

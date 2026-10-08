@@ -42,7 +42,8 @@ def author_response(h, newscore):
     link = urllib.parse.parse_qs(urllib.parse.urlparse(h.path).query).get("u", [""])[0]
     if not link.startswith(newscore.GN_LINK) or len(link) > 600:
         return send_json(h, {"error": "bad link"}, status=400)
-    name, status = newscore.author_for_google(link)
+    title = urllib.parse.parse_qs(urllib.parse.urlparse(h.path).query).get("t", [""])[0][:200]
+    name, status = newscore.author_for_article(link, title)
     if status == "ok":
         cc = "public, s-maxage=604800, stale-while-revalidate=86400" if name else "public, s-maxage=86400"
     else:
