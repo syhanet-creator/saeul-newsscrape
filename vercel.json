@@ -1,6 +1,6 @@
 {
   "functions": {
-    "api/news.py": { "maxDuration": 30 },
-    "api/summary.py": { "maxDuration": 30 }
+    "api/news.py": { "maxDuration": 30, "includeFiles": "newscore.py" },
+    "api/summary.py": { "maxDuration": 30, "includeFiles": "newscore.py" }
   }
 }
