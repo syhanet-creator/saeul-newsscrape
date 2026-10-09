@@ -573,7 +573,7 @@ def collect(days, kws=None, fast=False):
         fill_authors(arts)
     cluster(arts)
     return {"articles": arts, "errors": list(failed.values()), "keywords": kws,
-            "fetched": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+            "fetched": datetime.now(KST).strftime("%Y-%m-%d %H:%M:%S")}
 
 
 # ---------- 주간 AI 요약 ----------
@@ -665,6 +665,6 @@ def weekly_summary(days=7, kws=None):
     except Exception as e:
         return {"error": f"AI 요약 호출 실패: {e}"}
     out = {"summary": text, "count": sum(map(len, groups.values())), "groups": len(groups),
-           "generated": datetime.now().strftime("%Y-%m-%d %H:%M")}
+           "generated": datetime.now(KST).strftime("%Y-%m-%d %H:%M")}
     _cache[ck] = (time.time(), out)
     return out
