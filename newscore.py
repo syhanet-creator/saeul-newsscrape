@@ -90,6 +90,7 @@ def title_relevant(kw, title):
     return re.sub(r"\s+", "", _stem(kw)) in t
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) NewsScrap/1.0"
 KST = timezone(timedelta(hours=9))
+_BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
 SIM_THRESHOLD = 0.4
 FETCH_TIMEOUT = 8  # 지역 신문 한 번 요청의 제한 시간(초). 시간 초과 시 한 번 더 시도한다.
 CLAUDE_MODEL = os.environ.get("SUMMARY_MODEL", "claude-haiku-4-5-20251001")
@@ -166,14 +167,33 @@ ULSAN_BOX = re.compile(
     r"<dt><a href='(/\d+)'>(.*?)</a></dt>(.*?)class='etc'>(.*?)(\d{4}\.\d\d\.\d\d \d\d:\d\d)", re.S)
 
 
-def local_paper(name, base):
-    """같은 뉴스 CMS를 쓰는 지역 신문(울산뉴스넷·울주신문)의 사이트 검색 결과 1페이지를 읽는다."""
-    def fetch(kw, days):
+# 새울본부 탭에서 빠지면 눈에 띄는 지역 신문 2곳: 구글 뉴스가 먼저 화면에 나오고 이 신문들은 뒤에서 합쳐지므로
+# 오래 기다려도 사용자에게는 지연이 보이지 않는다. 그래서 더 오래 기다리고, 검색이 안 되면 다른 경로로도 시도한다.
+PATIENT_SOURCES = {"울산뉴스넷", "울주신문"}
+PATIENT_TIMEOUT = 10
+
+
+def local_paper(name, base, rss=None):
+    """같은 뉴스 CMS를 쓰는 지역 신문(울산뉴스넷·울주신문)의 사이트 검색 결과 1페이지를 읽는다.
+    patient 출처는 검색이 실패하면 https 로 한 번 더, 그래도 안 되면(rss 가 있으면) 기사 RSS 에서 키워드로 골라 쓴다."""
+    patient = name in PATIENT_SOURCES
+    timeout = PATIENT_TIMEOUT if patient else FETCH_TIMEOUT
+    hdr = {"User-Agent": _BROWSER_UA if patient else UA, "Accept-Language": "ko-KR,ko;q=0.9"}
+
+    def from_search(kw, days):
         q = urllib.parse.urlencode({"submit": "submit", "search_and": 1, "search_exec": "all",
                                     "search_section": "all", "news_order": 1, "search": kw})
-        req = urllib.request.Request(base + "/search.html?" + q, headers={"User-Agent": UA})
-        with urllib.request.urlopen(req, timeout=FETCH_TIMEOUT) as r:
-            page = r.read().decode("utf-8", "replace")
+        last = None
+        for root in ((base, base.replace("http://", "https://")) if patient else (base,)):
+            try:
+                with urllib.request.urlopen(urllib.request.Request(root + "/search.html?" + q, headers=hdr),
+                                            timeout=timeout) as r:
+                    page = r.read().decode("utf-8", "replace")
+                break
+            except Exception as e:  # noqa: BLE001
+                last = e
+        else:
+            raise last
         limit = time.time() - days * 86400
         items = []
         for path, title, lead, pre, when in ULSAN_BOX.findall(page):
@@ -186,6 +206,38 @@ def local_paper(name, base):
             items.append({"title": title, "link": base + path, "source": name,
                           "ts": ts, "local": True, "author": author})
         return items
+
+    def from_rss(kw, days):
+        with urllib.request.urlopen(urllib.request.Request(base + rss, headers=hdr), timeout=timeout) as r:
+            raw = r.read().decode("utf-8", "replace")
+        limit = time.time() - days * 86400
+        items = []
+        for it in re.findall(r"<item>.*?</item>", raw, re.S):
+            def tag(t):
+                m = re.search(rf"<{t}(?:\s[^>]*)?>(.*?)</{t}\s*>", it, re.S)
+                return html.unescape(re.sub(r"<!\[CDATA\[|\]\]>", "", m.group(1))).strip() if m else ""
+            title, desc = tag("title"), re.sub(r"<[^>]+>", " ", tag("description"))
+            if kw not in title and kw not in desc:
+                continue
+            try:
+                ts = parsedate_to_datetime(tag("pubDate")).timestamp()
+            except Exception:  # noqa: BLE001
+                continue
+            if ts >= limit and tag("link"):
+                items.append({"title": title, "link": tag("link"), "source": name, "ts": ts, "local": True,
+                              "author": clean_author(tag("author")) or clean_author(desc[:200])})
+        return items
+
+    def fetch(kw, days):
+        try:
+            return from_search(kw, days)
+        except Exception as e:  # noqa: BLE001
+            if not (patient and rss):
+                raise
+            try:
+                return from_rss(kw, days)
+            except Exception:  # noqa: BLE001
+                raise e
     return fetch
 
 
@@ -311,7 +363,7 @@ fetch_ujnews = cms_site("울산종합일보", "https://www.ujnews.co.kr", "https
                         "GET", kwname="q")
 
 fetch_ulsannews = local_paper("울산뉴스넷", "http://ulsannews.net")
-fetch_uljusinmun = local_paper("울주신문", "http://www.uljusinmun.co.kr")
+fetch_uljusinmun = local_paper("울주신문", "http://www.uljusinmun.co.kr", rss="/rss/rss_news.php")
 
 
 SOURCES = (("google", fetch_google), ("울산뉴스넷", fetch_ulsannews),
@@ -341,7 +393,7 @@ def _cached(name, fn, kw, days, ttl=120):
             # 지역 신문은 같은 사이트에 요청을 동시에 많이 보내지 않는다. 429 면 한 번 더 시도하고,
             # 응답이 없으면(시간 초과) 그 출처를 1분간 건너뛴다 -> 느린 사이트 하나가 전체를 붙잡지 못한다.
             with _locks[name]:
-                if time.time() < _down.get(name, 0):  # 차례를 기다리는 사이 다른 요청이 이미 실패했다면 바로 포기
+                if name not in PATIENT_SOURCES and time.time() < _down.get(name, 0):  # 차례를 기다리는 사이 다른 요청이 이미 실패했다면 바로 포기
                     raise TimeoutError(f"{name} 일시 중단")
                 for attempt in (0, 1):
                     try:
@@ -352,7 +404,8 @@ def _cached(name, fn, kw, days, ttl=120):
                             raise
                         time.sleep(1.5)
                     except (TimeoutError, urllib.error.URLError):
-                        _down[name] = time.time() + 60
+                        if name not in PATIENT_SOURCES:
+                            _down[name] = time.time() + 60
                         raise
                 time.sleep(0.1)
     except Exception:
@@ -390,7 +443,6 @@ def cluster(arts):
 
 
 GN_LINK = "https://news.google.com/rss/articles/"
-_BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
 
 
 def resolve_google(link, timeout=10):
@@ -651,7 +703,7 @@ def collect(days, kws=None, fast=False, use_local=True):
             return SOURCES[:1]
         return SOURCES
     jobs = [(kw, name, fn) for kw in kws for name, fn in sources_for(kw)]
-    merged, failed, detail = {}, {}, {}
+    merged, failed = {}, {}
     with ThreadPoolExecutor(max(1, len(jobs))) as ex:
         futs = [(kw, name, ex.submit(_cached, name, fn, kw, days)) for kw, name, fn in jobs]
     for kw, name, f in futs:
@@ -671,12 +723,11 @@ def collect(days, kws=None, fast=False, use_local=True):
                     merged[key] = a
         except Exception as e:
             failed.setdefault(name, f"{name}: 응답이 느려 일부 결과가 빠졌을 수 있습니다")
-            detail.setdefault(name, f"{type(e).__name__}: {str(e)[:100]} (키워드 {kw})")  # 원인 확인용(화면에는 표시하지 않는다)
-    arts = sorted(merged.values(), key=lambda a: a["ts"], reverse=True)
+    arts = sorted((a for a in merged.values() if not a["spam"]), key=lambda a: a["ts"], reverse=True)  # 스팸은 항상 제외
     if not fast and use_local:
         fill_authors(arts)
     cluster(arts)
-    return {"articles": arts, "errors": list(failed.values()), "error_detail": detail, "keywords": kws,
+    return {"articles": arts, "errors": list(failed.values()), "keywords": kws,
             "fetched": datetime.now(KST).strftime("%Y-%m-%d %H:%M:%S")}
 
 

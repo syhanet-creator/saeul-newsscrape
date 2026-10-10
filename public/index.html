@@ -178,8 +178,7 @@ details.kw{margin-bottom:12px;font-size:13px}details.kw summary{cursor:pointer;c
 <div class="bar"><input type="text" id="q" placeholder="결과 내 검색 (제목·언론사·기자)">
 <select id="days"><option value="1">최근 1일</option><option value="3">최근 3일</option><option value="7" selected>최근 7일</option><option value="30">최근 30일</option></select>
 <button class="act" id="re">새로고침</button></div>
-<div class="bar"><label class="ck"><input type="checkbox" id="nospam" checked> 스팸·광고 숨김 (<span id="sn">0</span>)</label>
-<span id="scrapbar" style="display:none;margin-left:auto"><button class="act" id="csv">CSV 내보내기</button> <button class="act" id="cp">목록 복사</button> <button class="act" id="clr">스크랩 비우기</button></span></div>
+<div class="bar"><span id="scrapbar" style="display:none;margin-left:auto"><button class="act" id="csv">CSV 내보내기</button> <button class="act" id="cp">목록 복사</button> <button class="act" id="clr">스크랩 비우기</button></span></div>
 <div id="list"><div class="empty">불러오는 중…</div></div>
 <div class="foot">출처: 구글 뉴스(새울본부 탭은 울산 지역 신문 포함) · 기사 저작권은 각 언론사에 있으며 링크로 원문을 연결합니다.<br>기자 이름은 접속할 때마다 조금씩 채워집니다.<br>안드로이드 크롬: 메뉴(⋮) → <b>앱 설치</b> 또는 <b>홈 화면에 추가</b><br>개인용 모니터링 도구이며 한국수력원자력 공식 서비스가 아닙니다. · v2.0</div>
 </div>
@@ -236,10 +235,8 @@ function render(){
   $('k1').textContent=cur.length;$('k2').textContent='–';$('k3').textContent=new Set(cur.map(a=>a.source)).size;$('k4').textContent='–';
   $('list').innerHTML=cur.length?cur.map(card).join(''):'<div class="empty">☆를 눌러 기사를 스크랩하세요.</div>';return}
  if(!data){$('list').innerHTML='<div class="empty">불러오는 중…</div>';return}
- const hide=$('nospam').checked;
- $('sn').textContent=data.articles.filter(a=>a.spam).length;
  const ak=activeKws();
- const arts=data.articles.filter(a=>(!hide||!a.spam)&&(!active.size||(a.kws||[]).some(k=>ak.has(k)))&&
+ const arts=data.articles.filter(a=>!a.spam&&(!active.size||(a.kws||[]).some(k=>ak.has(k)))&&
   (!q||(a.title+a.source+(a.author||'')).toLowerCase().includes(q)));
  const gs=new Map();arts.forEach(a=>{if(!gs.has(a.gid))gs.set(a.gid,[]);gs.get(a.gid).push(a)});
  const groups=[...gs.values()];
@@ -354,7 +351,7 @@ $('autosum').onchange=()=>store.set('autosum',$('autosum').checked);
 
 $('re').onclick=load;
 $('days').onchange=()=>{for(const k in TD)delete TD[k];load()};   /* 기간이 바뀌면 불러온 탭들을 모두 새로 받는다 */
-$('q').oninput=render;$('nospam').onchange=render;
+$('q').oninput=render;
 
 /* ---------- 기자 이름: 한 건씩 천천히 채운다 ---------- */
 const GN='https://news.google.com/rss/articles/';

@@ -15,10 +15,6 @@
     "api/tabs.py": {
       "maxDuration": 10,
       "includeFiles": "newscore.py"
-    },
-    "api/diag.py": {
-      "maxDuration": 30,
-      "includeFiles": "newscore.py"
     }
   },
   "headers": [
