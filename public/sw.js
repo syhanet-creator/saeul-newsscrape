@@ -1,16 +1,16 @@
 /* 서비스 워커: 앱 껍데기를 저장해 두고, 네트워크가 안 될 때 마지막으로 본 기사 목록을 보여 준다.
  * 전략
  *  - 화면(/)            : 네트워크 우선 → 실패하면 저장본 (온라인이면 항상 최신 UI)
- *  - /api/news, summary : 네트워크 우선 → 실패하면 마지막 응답(헤더 x-from-cache: 1 을 붙여 화면이 알 수 있게 함). 최근 8개만 보관.
+ *  - /api/news, summary : 네트워크 우선 → 실패하면 마지막 응답(헤더 x-from-cache: 1 을 붙여 화면이 알 수 있게 함). 최근 24개만 보관(탭 구성 + 탭별 목록).
  *  - /api/author        : 저장하지 않는다(화면이 브라우저에 따로 저장한다)
  *  - 아이콘·매니페스트   : 저장본 우선, 뒤에서 갱신
  * 버전을 올리면(VERSION) 이전 저장본은 자동으로 지워진다.
  */
-const VERSION = 'v2';
+const VERSION = 'v3';
 const SHELL = 'shell-' + VERSION;
 const DATA = 'data-' + VERSION;
 const SHELL_FILES = ['/', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/maskable-512.png', '/icons/favicon-64.png'];
-const MAX_DATA_ENTRIES = 8;
+const MAX_DATA_ENTRIES = 24;
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(SHELL).then(c => c.addAll(SHELL_FILES)).then(() => self.skipWaiting()));

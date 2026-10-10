@@ -13,5 +13,5 @@ from _common import respond  # noqa: E402
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
-        # 공개 사이트에서 AI 비용이 새지 않도록 기본 키워드·7일 기준 요약 하나만 만들고 CDN 에서 1시간 공유한다.
-        respond(self, lambda d, k, f: newscore.weekly_summary(7, None), ttl=3600)
+        # 공개 사이트에서 AI 비용이 새지 않도록 탭별 7일 요약만 만들고(탭은 정해진 목록만 허용) CDN 에서 1시간 공유한다.
+        respond(self, lambda d, k, f, t: newscore.weekly_summary(7, t or newscore.MAIN_TAB), ttl=3600)

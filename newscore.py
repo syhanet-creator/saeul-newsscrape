@@ -15,7 +15,40 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 
-KEYWORDS = ["한국수력원자력", "새울원자력본부", "한수원", "새울본부"]
+# ---------- v2.0 탭 구성 (서버 수집과 화면이 모두 이 설정을 쓴다: /api/tabs) ----------
+# main: 처음 열리는 메인 탭 / local: 울산 지역 신문까지 수집 / keywords: 탭마다 검색하는 해시태그(#) 키워드
+TABS_CFG = {
+    "version": "2.0",
+    # 다른 곳도 쓰는 일반적인 이름(지명이 들어간 시설·기관명 등)은 '한수원/한국수력원자력'이 함께 나온 기사만 가져온다.
+    # 구글 뉴스가 따옴표 검색을 느슨하게 처리해 관련 없는 글(여행 블로그, 게임 등)이 섞이는 것을 막는다.
+    # 탭에 "context": True 를 주면 그 탭의 모든 키워드에, "ambiguous" 에 적으면 그 키워드에만 적용된다.
+    "context_terms": ["한수원", "한국수력원자력"],
+    "ambiguous": ["미주지사", "유럽지사"],
+    "tabs": [
+        {"id": "saeul", "name": "새울본부", "main": True, "local": True,
+         "keywords": ["새울원자력본부", "새울본부"]},
+        {"id": "khnp", "name": "한수원",
+         "keywords": ["한국수력원자력주식회사", "한국수력원자력", "한수원", "한수원(주)"]},
+        {"id": "hanul", "name": "한울본부", "keywords": ["한울원자력본부", "한울본부"]},
+        {"id": "kori", "name": "고리본부", "keywords": ["고리원자력본부", "고리본부"]},
+        {"id": "hanbit", "name": "한빛본부", "keywords": ["한빛원자력본부", "한빛본부"]},
+        {"id": "wolsong", "name": "월성본부", "keywords": ["월성원자력본부", "월성본부"]},
+        {"id": "overseas", "name": "해외사업소",
+         "keywords": ["바라카건설소", "미주지사", "유럽지사", "엘바다건설소", "체르나보다TRF건설소",
+                      "체르나보다설비개선건설소", "두코바니건설소"]},
+        {"id": "pumped", "context": True, "name": "양수건설",
+         "keywords": ["영동양수건설소", "홍천양수건설소", "포천양수건설소"]},
+        {"id": "hydro", "context": True, "name": "수력양수",
+         "keywords": ["한강수력본부", "청평양수발전소", "삼랑진양수발전소", "무주양수발전소", "산청양수발전소",
+                      "양양양수발전소", "청송양수발전소", "예천양수발전소", "원자력수소융복합센터"]},
+        {"id": "research", "context": True, "name": "연구보건", "keywords": ["중앙연구원", "방사선보건원"]},
+        {"id": "etc", "context": True, "name": "기타 기관", "keywords": ["인재개발원", "구매기술센터", "공간디자인센터"]},
+    ],
+}
+TABS = {t["id"]: t for t in TABS_CFG["tabs"]}
+MAIN_TAB = next(t["id"] for t in TABS_CFG["tabs"] if t.get("main"))
+KEYWORDS = TABS[MAIN_TAB]["keywords"]
+CONTEXT_KWS = set(TABS_CFG["ambiguous"]) | {k for t in TABS_CFG["tabs"] if t.get("context") for k in t["keywords"]}
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) NewsScrap/1.0"
 KST = timezone(timedelta(hours=9))
 SIM_THRESHOLD = 0.4
@@ -36,8 +69,17 @@ def is_spam(a):
 
 
 # ---------- 수집 ----------
+def google_query(kw):
+    """키워드 검색식. 일반적인 이름(예: 미주지사)은 '한수원 OR 한국수력원자력'이 함께 나온 기사만."""
+    q = f'"{kw}"'
+    if kw in CONTEXT_KWS:
+        ctx = " OR ".join(f'"{c}"' for c in TABS_CFG["context_terms"])
+        q += f" ({ctx})"
+    return q
+
+
 def fetch_google(kw, days):
-    q = f'"{kw}" when:{days}d'
+    q = f"{google_query(kw)} when:{days}d"
     url = ("https://news.google.com/rss/search?q=" + urllib.parse.quote(q)
            + "&hl=ko&gl=KR&ceid=KR:ko")
     req = urllib.request.Request(url, headers={"User-Agent": UA})
@@ -546,10 +588,20 @@ def fill_authors(arts, limit=30):
         a["author"] = _authors.get(a["link"], "")
 
 
-def collect(days, kws=None, fast=False):
-    """fast=True 면 구글 뉴스만(빠른 첫 화면), 아니면 지역 신문까지."""
-    sources = SOURCES[:1] if fast else SOURCES
-    kws = [k for k in (kws or KEYWORDS)][:8]
+def collect_tab(tab_id, days, fast=False):
+    """탭 하나의 기사를 수집한다. 지역 신문은 local 탭(새울본부)에서만 함께 읽는다."""
+    tab = TABS.get(tab_id)
+    if not tab:
+        return {"error": "알 수 없는 탭입니다."}
+    data = collect(days, tab["keywords"], fast=fast, use_local=bool(tab.get("local")))
+    data["tab"] = tab_id
+    return data
+
+
+def collect(days, kws=None, fast=False, use_local=True):
+    """fast=True 면 구글 뉴스만(빠른 첫 화면). 아니면 use_local 일 때 지역 신문까지."""
+    sources = SOURCES[:1] if (fast or not use_local) else SOURCES
+    kws = [k for k in (kws or KEYWORDS)][:12]
     merged, failed = {}, {}
     with ThreadPoolExecutor(max(1, len(kws) * len(sources))) as ex:
         futs = [(kw, name, ex.submit(_cached, name, fn, kw, days)) for kw in kws for name, fn in sources]
@@ -569,7 +621,7 @@ def collect(days, kws=None, fast=False):
         except Exception as e:
             failed.setdefault(name, f"{name}: 응답이 느려 일부 결과가 빠졌을 수 있습니다")
     arts = sorted(merged.values(), key=lambda a: a["ts"], reverse=True)
-    if not fast:
+    if not fast and use_local:
         fill_authors(arts)
     cluster(arts)
     return {"articles": arts, "errors": list(failed.values()), "keywords": kws,
@@ -640,14 +692,18 @@ def _ask_llm(prompt):
     raise RuntimeError("GEMINI_API_KEY 또는 ANTHROPIC_API_KEY 환경변수가 설정되지 않았습니다.")
 
 
-def weekly_summary(days=7, kws=None):
+def weekly_summary(days=7, tab_id=None):
+    """탭 하나의 최근 days 일 기사를 AI 로 요약한다(탭마다 따로, 30분 서버 기억 + CDN 1시간 공유)."""
     if not (os.environ.get("GEMINI_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")):
         return {"error": "GEMINI_API_KEY 또는 ANTHROPIC_API_KEY 환경변수가 설정되지 않았습니다."}
-    ck = (days, tuple(kws or ()))
+    tab_id = tab_id if tab_id in TABS else MAIN_TAB
+    ck = (days, tab_id)
     hit = _cache.get(ck)
     if hit and time.time() - hit[0] < 1800:
         return hit[1]
-    data = collect(days, kws)
+    data = collect_tab(tab_id, days)
+    if data.get("error"):
+        return data
     groups = {}
     for a in data["articles"]:
         if not a["spam"]:
@@ -655,7 +711,11 @@ def weekly_summary(days=7, kws=None):
     ordered = sorted(groups.values(), key=len, reverse=True)[:60]
     lines = [f"- ({len(g)}건) {g[0]['title']} / {', '.join(sorted({x['source'] for x in g})[:4])}"
              for g in ordered]
-    prompt = (f"아래는 최근 {days}일간 '{'·'.join(data['keywords'])}' 관련 뉴스를 "
+    if not groups:
+        return {"summary": "최근 기간에 이 탭의 기사가 없어 요약할 내용이 없습니다.", "count": 0, "groups": 0,
+                "generated": datetime.now(KST).strftime("%Y-%m-%d %H:%M"), "tab": tab_id}
+    name = TABS[tab_id]["name"]
+    prompt = (f"아래는 최근 {days}일간 한국수력원자력(한수원) '{name}' 관련('{'·'.join(data['keywords'])}') 뉴스를 "
               "유사 기사끼리 묶은 목록입니다(괄호는 보도 건수).\n"
               "한국어로 이번 주 주요 이슈를 요약해 주세요. 형식: 먼저 2~3문장 총평, 이어서 "
               "건수가 많은 순으로 주요 이슈 3~6개를 '- **이슈명**: 한두 문장 설명' 형태의 목록으로. "
@@ -665,6 +725,6 @@ def weekly_summary(days=7, kws=None):
     except Exception as e:
         return {"error": f"AI 요약 호출 실패: {e}"}
     out = {"summary": text, "count": sum(map(len, groups.values())), "groups": len(groups),
-           "generated": datetime.now(KST).strftime("%Y-%m-%d %H:%M")}
+           "generated": datetime.now(KST).strftime("%Y-%m-%d %H:%M"), "tab": tab_id}
     _cache[ck] = (time.time(), out)
     return out

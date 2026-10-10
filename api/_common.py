@@ -1,16 +1,18 @@
 import json
+import re
 import urllib.parse
 
 
 def parse_query(path):
-    """?days=7&kw=한수원,새울본부&fast=1 -> (days, kws|None, fast)"""
+    """?days=7&tab=saeul&fast=1 -> (days, kws|None, fast, tab)"""
     q = urllib.parse.parse_qs(urllib.parse.urlparse(path).query)
     try:
         days = max(1, min(int(q.get("days", ["7"])[0]), 365))
     except ValueError:
         days = 7
     kws = [k.strip()[:30] for k in q.get("kw", [""])[0].split(",") if k.strip()][:8]
-    return days, (kws or None), q.get("fast", ["0"])[0] == "1"
+    tab = re.sub(r"[^a-z0-9_]", "", q.get("tab", [""])[0].lower())[:20]
+    return days, (kws or None), q.get("fast", ["0"])[0] == "1", tab
 
 
 def send_json(h, obj, cache_control="no-store", status=200):
@@ -24,13 +26,13 @@ def send_json(h, obj, cache_control="no-store", status=200):
 
 
 def respond(h, fn, ttl=0):
-    """요청 핸들러 h 에 fn(days, kws, fast) 의 결과를 JSON 으로 응답한다.
+    """요청 핸들러 h 에 fn(days, kws, fast, tab) 의 결과를 JSON 으로 응답한다.
 
     ttl > 0 이면 Vercel CDN 이 같은 주소의 응답을 ttl 초 동안 모든 방문자에게 재사용한다.
     (공개 사이트에서 방문자가 많아도 외부 호출·AI 비용이 늘지 않게 하는 장치.) 오류 응답은 캐시하지 않는다.
     """
-    days, kws, fast = parse_query(h.path)
-    result = fn(days, kws, fast)
+    days, kws, fast, tab = parse_query(h.path)
+    result = fn(days, kws, fast, tab)
     if isinstance(result, dict) and result.get("errors"):
         ttl = min(ttl, 10)  # 일부 출처가 실패한 응답은 오래 공유하지 않는다
     cacheable = ttl > 0 and not (isinstance(result, dict) and result.get("error"))

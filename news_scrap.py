@@ -18,8 +18,9 @@ PUBLIC = Path(__file__).parent / "public"
 TYPES = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8",
          ".webmanifest": "application/manifest+json; charset=utf-8", ".png": "image/png",
          ".json": "application/json; charset=utf-8"}
-ROUTES = {"/api/news": lambda d, k, f: newscore.collect(d, k, fast=f),
-          "/api/summary": lambda d, k, f: newscore.weekly_summary(d, k)}
+ROUTES = {"/api/news": lambda d, k, f, t: newscore.collect_tab(t or newscore.MAIN_TAB, d, fast=f),
+          "/api/summary": lambda d, k, f, t: newscore.weekly_summary(7, t or newscore.MAIN_TAB),
+          "/api/tabs": lambda d, k, f, t: newscore.TABS_CFG}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -31,8 +32,8 @@ class Handler(BaseHTTPRequestHandler):
         if u.path == "/api/author":
             return author_response(self, newscore)
         if u.path in ROUTES:
-            days, kws, fast = parse_query(self.path)
-            body = json.dumps(ROUTES[u.path](days, kws, fast), ensure_ascii=False).encode()
+            days, kws, fast, tab = parse_query(self.path)
+            body = json.dumps(ROUTES[u.path](days, kws, fast, tab), ensure_ascii=False).encode()
             ctype = "application/json; charset=utf-8"
         else:
             # public/ 아래의 정적 파일(화면, 아이콘, 매니페스트, 서비스 워커)을 내보낸다.

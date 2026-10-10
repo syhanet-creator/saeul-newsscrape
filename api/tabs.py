@@ -8,9 +8,10 @@ for _p in (_here, os.path.dirname(_here)):
         sys.path.insert(0, _p)
 
 import newscore  # noqa: E402
-from _common import respond  # noqa: E402
+from _common import send_json  # noqa: E402
 
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
-        respond(self, lambda d, k, f, t: newscore.collect_tab(t or newscore.MAIN_TAB, d, fast=f), ttl=60)
+        # 탭 구성(이름·키워드)은 거의 바뀌지 않으므로 CDN 에서 1시간 공유한다.
+        send_json(self, newscore.TABS_CFG, "public, s-maxage=3600, stale-while-revalidate=86400")

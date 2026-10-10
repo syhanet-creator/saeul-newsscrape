@@ -1,27 +1,57 @@
 {
   "functions": {
-    "api/news.py": { "maxDuration": 60, "includeFiles": "newscore.py" },
-    "api/summary.py": { "maxDuration": 60, "includeFiles": "newscore.py" },
-    "api/author.py": { "maxDuration": 30, "includeFiles": "newscore.py" }
+    "api/news.py": {
+      "maxDuration": 60,
+      "includeFiles": "newscore.py"
+    },
+    "api/summary.py": {
+      "maxDuration": 60,
+      "includeFiles": "newscore.py"
+    },
+    "api/author.py": {
+      "maxDuration": 30,
+      "includeFiles": "newscore.py"
+    },
+    "api/tabs.py": {
+      "maxDuration": 10,
+      "includeFiles": "newscore.py"
+    }
   },
   "headers": [
     {
       "source": "/sw.js",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" },
-        { "key": "Service-Worker-Allowed", "value": "/" }
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        },
+        {
+          "key": "Service-Worker-Allowed",
+          "value": "/"
+        }
       ]
     },
     {
       "source": "/manifest.webmanifest",
       "headers": [
-        { "key": "Content-Type", "value": "application/manifest+json; charset=utf-8" },
-        { "key": "Cache-Control", "value": "public, max-age=3600" }
+        {
+          "key": "Content-Type",
+          "value": "application/manifest+json; charset=utf-8"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600"
+        }
       ]
     },
     {
       "source": "/icons/(.*)",
-      "headers": [{ "key": "Cache-Control", "value": "public, max-age=86400" }]
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400"
+        }
+      ]
     }
   ]
 }
