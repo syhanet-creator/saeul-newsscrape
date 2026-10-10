@@ -44,7 +44,8 @@ TABS_CFG = {
          "keywords": ["한강수력본부", "청평양수발전소", "삼랑진양수발전소", "무주양수발전소", "산청양수발전소",
                       "양양양수발전소", "청송양수발전소", "예천양수발전소", "원자력수소융복합센터"]},
         {"id": "research", "context": True, "name": "연구보건", "keywords": ["중앙연구원", "방사선보건원"]},
-        {"id": "etc", "context": True, "name": "기타 기관", "keywords": ["인재개발원", "구매기술센터", "공간디자인센터"]},
+        {"id": "hrd", "context": True, "name": "인재개발원", "keywords": ["인재개발원"]},
+        {"id": "etc", "context": True, "name": "기타 사업소", "keywords": ["구매기술센터", "공간디자인센터"]},
     ],
 }
 _all_kws = []
