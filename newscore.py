@@ -329,6 +329,8 @@ def _cached(name, fn, kw, days, ttl=120):
     """같은 (출처, 키워드, 기간) 요청은 2분간 재사용해 지역 신문 사이트에 부담을 줄인다."""
     key = (name, kw, days)
     hit = _fcache.get(key)
+    # 지역 신문은 하루에 올라오는 기사가 몇 건 안 되고, 일부 사이트는 클라우드 서버의 잦은 접속을 막으므로 10분간 재사용한다
+    ttl = ttl if name == "google" else max(ttl, 600)
     if hit and time.time() - hit[0] < ttl:
         return [dict(a) for a in hit[1]]
     try:
