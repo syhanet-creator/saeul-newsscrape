@@ -25,6 +25,8 @@ TABS_CFG = {
     "context_terms": ["한수원", "한국수력원자력"],
     "ambiguous": ["미주지사", "유럽지사"],
     "tabs": [
+        # 전체: 모든 탭의 키워드를 한꺼번에 수집(키워드는 아래에서 채운다). 지역 신문은 새울본부 키워드에만 적용.
+        {"id": "all", "name": "전체", "all": True, "local": True, "keywords": []},
         {"id": "saeul", "name": "새울본부", "main": True, "local": True,
          "keywords": ["새울원자력본부", "새울본부"]},
         {"id": "khnp", "name": "한수원",
@@ -45,10 +47,34 @@ TABS_CFG = {
         {"id": "etc", "context": True, "name": "기타 기관", "keywords": ["인재개발원", "구매기술센터", "공간디자인센터"]},
     ],
 }
+_all_kws = []
+for _t in TABS_CFG["tabs"]:
+    if not _t.get("all"):
+        _all_kws += [k for k in _t["keywords"] if k not in _all_kws]
+for _t in TABS_CFG["tabs"]:
+    if _t.get("all"):
+        _t["keywords"] = _all_kws
 TABS = {t["id"]: t for t in TABS_CFG["tabs"]}
 MAIN_TAB = next(t["id"] for t in TABS_CFG["tabs"] if t.get("main"))
 KEYWORDS = TABS[MAIN_TAB]["keywords"]
 CONTEXT_KWS = set(TABS_CFG["ambiguous"]) | {k for t in TABS_CFG["tabs"] if t.get("context") for k in t["keywords"]}
+# 구글이 본문 어딘가에만 단어가 나와도 결과에 넣어서(예: 시장 일정 기사에 '한수원'·'인재개발원'이 스쳐 지나감) 잡음이 생긴다.
+# 이런 키워드(와 검색이 불안정한 '한수원(주)' 등)의 기사는 **제목에** 한수원/한국수력원자력 또는 그 키워드가 있어야 인정한다.
+TITLE_REQUIRED = CONTEXT_KWS | {"한수원(주)", "한국수력원자력주식회사"}
+
+
+def _stem(kw):
+    """시설 이름에서 끝말(건설소·발전소·본부·센터)을 뗀 앞부분. 영동양수건설소 -> 영동양수 (기사 제목은 '영동양수발전소'로 쓰기도 한다)."""
+    for suf in ("건설소", "발전소", "본부", "센터"):
+        if kw.endswith(suf) and len(kw) - len(suf) >= 2:
+            return kw[: -len(suf)]
+    return kw
+
+
+def title_relevant(kw, title):
+    """제목에 한수원/한국수력원자력이 있거나 키워드(앞부분)가 있으면 관련 기사로 본다. 공백은 무시한다."""
+    t = re.sub(r"\s+", "", title)
+    return re.sub(r"\s+", "", _stem(kw)) in t or any(c in t for c in TABS_CFG["context_terms"])
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) NewsScrap/1.0"
 KST = timezone(timedelta(hours=9))
 SIM_THRESHOLD = 0.4
@@ -281,6 +307,7 @@ SOURCES = (("google", fetch_google), ("울산뉴스넷", fetch_ulsannews),
            ("울산종합일보", fetch_ujnews))
 
 _fcache = {}
+_gsem = threading.Semaphore(8)
 _down = {}  # 출처 이름 -> 이 시각까지 건너뜀
 _locks = {name: threading.Semaphore(2) for name, _ in SOURCES}
 
@@ -293,7 +320,8 @@ def _cached(name, fn, kw, days, ttl=120):
         return [dict(a) for a in hit[1]]
     try:
         if name == "google":
-            res = fn(kw, days)
+            with _gsem:  # 전체 탭처럼 키워드가 많아도 구글에는 동시에 8개까지만
+                res = fn(kw, days)
         else:
             # 지역 신문은 같은 사이트에 요청을 동시에 많이 보내지 않는다. 429 면 한 번 더 시도하고,
             # 응답이 없으면(시간 초과) 그 출처를 1분간 건너뛴다 -> 느린 사이트 하나가 전체를 붙잡지 못한다.
@@ -593,21 +621,29 @@ def collect_tab(tab_id, days, fast=False):
     tab = TABS.get(tab_id)
     if not tab:
         return {"error": "알 수 없는 탭입니다."}
-    data = collect(days, tab["keywords"], fast=fast, use_local=bool(tab.get("local")))
+    use_local = set(TABS[MAIN_TAB]["keywords"]) if tab.get("all") else bool(tab.get("local"))
+    data = collect(days, tab["keywords"], fast=fast, use_local=use_local)
     data["tab"] = tab_id
     return data
 
 
 def collect(days, kws=None, fast=False, use_local=True):
     """fast=True 면 구글 뉴스만(빠른 첫 화면). 아니면 use_local 일 때 지역 신문까지."""
-    sources = SOURCES[:1] if (fast or not use_local) else SOURCES
-    kws = [k for k in (kws or KEYWORDS)][:12]
+    kws = [k for k in (kws or KEYWORDS)][:60]
+
+    def sources_for(kw):  # use_local: True(전부) / 키워드 집합(그 키워드만) / False
+        if fast or not use_local or not (use_local is True or kw in use_local):
+            return SOURCES[:1]
+        return SOURCES
+    jobs = [(kw, name, fn) for kw in kws for name, fn in sources_for(kw)]
     merged, failed = {}, {}
-    with ThreadPoolExecutor(max(1, len(kws) * len(sources))) as ex:
-        futs = [(kw, name, ex.submit(_cached, name, fn, kw, days)) for kw in kws for name, fn in sources]
+    with ThreadPoolExecutor(max(1, len(jobs))) as ex:
+        futs = [(kw, name, ex.submit(_cached, name, fn, kw, days)) for kw, name, fn in jobs]
     for kw, name, f in futs:
         try:
             for a in f.result():
+                if kw in TITLE_REQUIRED and not title_relevant(kw, a["title"]):
+                    continue  # 본문에만 단어가 스친 기사(관련 없음)
                 key = a["link"] or a["title"]
                 if key in merged:
                     if kw not in merged[key]["kws"]:
@@ -715,7 +751,8 @@ def weekly_summary(days=7, tab_id=None):
         return {"summary": "최근 기간에 이 탭의 기사가 없어 요약할 내용이 없습니다.", "count": 0, "groups": 0,
                 "generated": datetime.now(KST).strftime("%Y-%m-%d %H:%M"), "tab": tab_id}
     name = TABS[tab_id]["name"]
-    prompt = (f"아래는 최근 {days}일간 한국수력원자력(한수원) '{name}' 관련('{'·'.join(data['keywords'])}') 뉴스를 "
+    kwtxt = "" if TABS[tab_id].get("all") else f"('{'·'.join(data['keywords'])}')"
+    prompt = (f"아래는 최근 {days}일간 한국수력원자력(한수원) '{name}' 관련{kwtxt} 뉴스를 "
               "유사 기사끼리 묶은 목록입니다(괄호는 보도 건수).\n"
               "한국어로 이번 주 주요 이슈를 요약해 주세요. 형식: 먼저 2~3문장 총평, 이어서 "
               "건수가 많은 순으로 주요 이슈 3~6개를 '- **이슈명**: 한두 문장 설명' 형태의 목록으로. "

@@ -139,6 +139,10 @@ details.kw{margin-bottom:12px;font-size:13px}details.kw summary{cursor:pointer;c
 @media(hover:none){.item:hover{transform:none;box-shadow:none}.item a:hover{color:var(--tx)}}
 .tab.main:before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:currentColor;opacity:.7;margin-right:6px;vertical-align:middle}
 .ver{background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.4);border-radius:6px;padding:0 6px;margin-left:4px;letter-spacing:.04em}
+.seg,#chips{cursor:grab}.seg .tab,#chips .chip{cursor:inherit}
+.seg.dragging,#chips.dragging{cursor:grabbing;user-select:none;-webkit-user-select:none}
+.seg.dragging .tab,#chips.dragging .chip{pointer-events:none}
+@media(pointer:coarse){.seg,#chips{cursor:auto}}
 </style></head><body>
 
 <header class="hero">
@@ -233,7 +237,8 @@ function render(){
  if(!data){$('list').innerHTML='<div class="empty">불러오는 중…</div>';return}
  const hide=$('nospam').checked;
  $('sn').textContent=data.articles.filter(a=>a.spam).length;
- const arts=data.articles.filter(a=>(!hide||!a.spam)&&(!active.size||(a.kws||[]).some(k=>active.has(k)))&&
+ const ak=activeKws();
+ const arts=data.articles.filter(a=>(!hide||!a.spam)&&(!active.size||(a.kws||[]).some(k=>ak.has(k)))&&
   (!q||(a.title+a.source+(a.author||'')).toLowerCase().includes(q)));
  const gs=new Map();arts.forEach(a=>{if(!gs.has(a.gid))gs.set(a.gid,[]);gs.get(a.gid).push(a)});
  const groups=[...gs.values()];
@@ -248,9 +253,16 @@ function render(){
 $('list').onclick=e=>{const b=e.target.closest('.star');if(!b)return;const a=cur[+b.dataset.i];if(!a)return;
  if(scraps[a.link])delete scraps[a.link];else scraps[a.link]={title:a.title,link:a.link,source:a.source,ts:a.ts,author:a.author||''};
  store.set('scraps',scraps);setCounts();render()};
+/* 전체 탭: 칩은 '탭 이름'(눌러서 그 탭의 키워드에 걸린 기사만), 그 밖의 탭: 칩은 해시태그 키워드 */
+const isAll=()=>!!(TABMAP[tab]&&TABMAP[tab].all);
+function activeKws(){
+ if(!isAll())return active;
+ const s=new Set();active.forEach(id=>(TABMAP[id]?TABMAP[id].keywords:[]).forEach(k=>s.add(k)));return s}
 function chips(){
  const t=TABMAP[tab];
- $('chips').innerHTML=t?t.keywords.map(k=>`<button class="chip ${active.has(k)?'on':''}" data-k="${esc(k)}">${esc(k)}</button>`).join(''):'';
+ $('chips').innerHTML=!t?'':isAll()
+  ?TABLIST.filter(x=>!x.all).map(x=>`<button class="chip ${active.has(x.id)?'on':''}" data-k="${esc(x.id)}">${esc(x.name)}</button>`).join('')
+  :t.keywords.map(k=>`<button class="chip ${active.has(k)?'on':''}" data-k="${esc(k)}">${esc(k)}</button>`).join('');
  document.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{const k=b.dataset.k;active.has(k)?active.delete(k):active.add(k);chips();render()});
 }
 
@@ -370,6 +382,28 @@ async function fetchAuthors(){
   const ks=Object.keys(authMap);if(ks.length>3000)authMap=Object.fromEntries(ks.slice(-2000).map(k=>[k,authMap[k]]));
   store.set('auth5',authMap)}
 }
+
+/* ---------- 탭 바·칩 바를 손 모양으로 끌어서 좌우로 움직이기 (마우스) ---------- */
+function dragScroll(el){
+ let down=false,moved=false,sx=0,sl=0;
+ el.addEventListener('pointerdown',e=>{
+  if(e.pointerType!=='mouse'||e.button!==0)return;   /* 터치는 브라우저가 손가락으로 밀어 준다 */
+  down=true;moved=false;sx=e.clientX;sl=el.scrollLeft});
+ addEventListener('pointermove',e=>{
+  if(!down)return;const dx=e.clientX-sx;
+  if(!moved&&Math.abs(dx)>4){moved=true;el.classList.add('dragging')}
+  if(moved)el.scrollLeft=sl-dx});
+ const end=()=>{if(!down)return;down=false;el.classList.remove('dragging')};
+ addEventListener('pointerup',end);addEventListener('pointercancel',end);
+ /* 끌고 나서 손을 뗄 때 탭이 눌리지 않게 한다 */
+ el.addEventListener('click',e=>{if(moved){e.stopPropagation();e.preventDefault();moved=false}},true);
+ /* 마우스 휠로도 좌우 이동 (세로로 굴려도 옆으로 밀린다. 끝에 닿으면 페이지가 세로로 스크롤된다) */
+ el.addEventListener('wheel',e=>{
+  if(Math.abs(e.deltaY)<=Math.abs(e.deltaX)||el.scrollWidth<=el.clientWidth)return;
+  const atL=el.scrollLeft<=0&&e.deltaY<0,atR=el.scrollLeft+el.clientWidth>=el.scrollWidth-1&&e.deltaY>0;
+  if(atL||atR)return;el.scrollLeft+=e.deltaY;e.preventDefault()},{passive:false});
+}
+dragScroll($('tabs'));dragScroll($('chips'));
 
 /* ---------- PWA: 서비스 워커·설치 버튼 ---------- */
 if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));
