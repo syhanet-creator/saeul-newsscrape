@@ -372,6 +372,7 @@ SOURCES = (("google", fetch_google), ("울산뉴스넷", fetch_ulsannews),
            ("울산종합일보", fetch_ujnews))
 
 _fcache = {}
+LAST_FAIL = {}  # 출처별 마지막 실패 원인(주소에 debug=1 을 붙였을 때만 응답에 보인다)
 _gsem = threading.Semaphore(8)
 _down = {}  # 출처 이름 -> 이 시각까지 건너뜀
 _locks = {name: threading.Semaphore(2) for name, _ in SOURCES}
@@ -723,6 +724,7 @@ def collect(days, kws=None, fast=False, use_local=True):
                     merged[key] = a
         except Exception as e:
             failed.setdefault(name, f"{name}: 응답이 느려 일부 결과가 빠졌을 수 있습니다")
+            LAST_FAIL[name] = f"{type(e).__name__}: {str(e)[:120]} (키워드 {kw}, {datetime.now(KST).strftime('%H:%M:%S')})"
     arts = sorted((a for a in merged.values() if not a["spam"]), key=lambda a: a["ts"], reverse=True)  # 스팸은 항상 제외
     if not fast and use_local:
         fill_authors(arts)

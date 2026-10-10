@@ -13,4 +13,9 @@ from _common import respond  # noqa: E402
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
-        respond(self, lambda d, k, f, t: newscore.collect_tab(t or newscore.MAIN_TAB, d, fast=f), ttl=60)
+        def run(d, k, f, t):
+            res = newscore.collect_tab(t or newscore.MAIN_TAB, d, fast=f)
+            if "debug=1" in self.path and isinstance(res, dict):
+                res["last_fail"] = dict(newscore.LAST_FAIL)
+            return res
+        respond(self, run, ttl=0 if "debug=1" in self.path else 60)
