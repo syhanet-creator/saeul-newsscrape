@@ -48,4 +48,26 @@ class handler(BaseHTTPRequestHandler):
             attempt("브라우저 UA + 첫 화면", f"http://{host}/", BROWSER),
             attempt("브라우저 UA + RSS", f"http://{host}/rss/rss_news.php", BROWSER),
         ]
-        send_json(self, {"site": host, "region": os.environ.get("VERCEL_REGION"), "results": out})
+        # 실제 수집 함수를 그대로 실행해 어떤 예외가 나는지 본다(순서대로 / 동시에)
+        import threading
+        fn = newscore.fetch_ulsannews if "ulsannews" in host else newscore.fetch_uljusinmun
+        real = []
+        for kw in ("새울원자력본부", "새울본부", "한국수력원자력", "한수원"):
+            t0 = time.time()
+            try:
+                r = fn(kw, 7)
+                real.append({"kw": kw, "ok": len(r), "ms": round((time.time() - t0) * 1000)})
+            except Exception as e:
+                real.append({"kw": kw, "exc": f"{type(e).__name__}: {str(e)[:80]}", "ms": round((time.time() - t0) * 1000)})
+        conc = [None] * 4
+
+        def run(i, kw):
+            t0 = time.time()
+            try:
+                conc[i] = {"kw": kw, "ok": len(fn(kw, 7)), "ms": round((time.time() - t0) * 1000)}
+            except Exception as e:
+                conc[i] = {"kw": kw, "exc": f"{type(e).__name__}: {str(e)[:80]}", "ms": round((time.time() - t0) * 1000)}
+        th = [threading.Thread(target=run, args=(i, kw)) for i, kw in enumerate(("새울원자력본부", "새울본부", "한국수력원자력", "한수원"))]
+        [x.start() for x in th]
+        [x.join() for x in th]
+        send_json(self, {"site": host, "region": os.environ.get("VERCEL_REGION"), "results": out, "real_sequential": real, "real_concurrent": conc})
