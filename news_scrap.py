@@ -1,6 +1,6 @@
-"""한수원/새울본부 뉴스 스크랩 앱 - 로컬 실행용.
+"""한수원 뉴스 스크랩 2.0 (새울본부 메인 + 본부·사업소별 탭) - 로컬 실행용.
 실행: python news_scrap.py  (브라우저가 자동으로 열립니다)
-주간 AI 요약을 쓰려면 환경변수 ANTHROPIC_API_KEY 가 필요합니다.
+주간 AI 요약을 쓰려면 환경변수 GEMINI_API_KEY 또는 ANTHROPIC_API_KEY 가 필요합니다.
 Vercel 배포 시에는 public/index.html + api/*.py 가 사용됩니다.
 """
 import json

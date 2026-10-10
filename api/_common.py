@@ -7,9 +7,11 @@ def parse_query(path):
     """?days=7&tab=saeul&fast=1 -> (days, kws|None, fast, tab)"""
     q = urllib.parse.parse_qs(urllib.parse.urlparse(path).query)
     try:
-        days = max(1, min(int(q.get("days", ["7"])[0]), 365))
+        days = int(q.get("days", ["7"])[0])
     except ValueError:
         days = 7
+    # 허용 기간(1·3·7·14·30일)으로만 맞춘다: 값을 바꿔 가며 보내 서버가 매번 새로 수집·조회하게 만드는 것을 막는다.
+    days = next((d for d in (1, 3, 7, 14, 30) if days <= d), 30)
     kws = [k.strip()[:30] for k in q.get("kw", [""])[0].split(",") if k.strip()][:8]
     tab = re.sub(r"[^a-z0-9_]", "", q.get("tab", [""])[0].lower())[:20]
     return days, (kws or None), q.get("fast", ["0"])[0] == "1", tab

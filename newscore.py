@@ -27,14 +27,14 @@ TABS_CFG = {
     "tabs": [
         # 전체: 모든 탭의 키워드를 한꺼번에 수집(키워드는 아래에서 채운다). 지역 신문은 새울본부 키워드에만 적용.
         {"id": "all", "name": "전체", "all": True, "local": True, "keywords": []},
-        {"id": "saeul", "name": "새울본부", "main": True, "local": True,
+        {"id": "saeul", "title_has": ["새울"], "name": "새울본부", "main": True, "local": True,
          "keywords": ["새울원자력본부", "새울본부"]},
         {"id": "khnp", "name": "한수원",
          "keywords": ["한국수력원자력주식회사", "한국수력원자력", "한수원", "한수원(주)"]},
-        {"id": "hanul", "name": "한울본부", "keywords": ["한울원자력본부", "한울본부"]},
-        {"id": "kori", "name": "고리본부", "keywords": ["고리원자력본부", "고리본부"]},
-        {"id": "hanbit", "name": "한빛본부", "keywords": ["한빛원자력본부", "한빛본부"]},
-        {"id": "wolsong", "name": "월성본부", "keywords": ["월성원자력본부", "월성본부"]},
+        {"id": "hanul", "title_has": ["한울"], "name": "한울본부", "keywords": ["한울원자력본부", "한울본부"]},
+        {"id": "kori", "title_has": ["고리"], "name": "고리본부", "keywords": ["고리원자력본부", "고리본부"]},
+        {"id": "hanbit", "title_has": ["한빛"], "name": "한빛본부", "keywords": ["한빛원자력본부", "한빛본부"]},
+        {"id": "wolsong", "title_has": ["월성"], "name": "월성본부", "keywords": ["월성원자력본부", "월성본부"]},
         {"id": "overseas", "name": "해외사업소",
          "keywords": ["바라카건설소", "미주지사", "유럽지사", "엘바다건설소", "체르나보다TRF건설소",
                       "체르나보다설비개선건설소", "두코바니건설소"]},
@@ -60,7 +60,8 @@ KEYWORDS = TABS[MAIN_TAB]["keywords"]
 CONTEXT_KWS = set(TABS_CFG["ambiguous"]) | {k for t in TABS_CFG["tabs"] if t.get("context") for k in t["keywords"]}
 # 구글이 본문 어딘가에만 단어가 나와도 결과에 넣어서(예: 시장 일정 기사에 '한수원'·'인재개발원'이 스쳐 지나감) 잡음이 생긴다.
 # 이런 키워드(와 검색이 불안정한 '한수원(주)' 등)의 기사는 **제목에** 한수원/한국수력원자력 또는 그 키워드가 있어야 인정한다.
-TITLE_REQUIRED = CONTEXT_KWS | {"한수원(주)", "한국수력원자력주식회사"}
+KW_TITLE_HAS = {k: t["title_has"] for t in TABS_CFG["tabs"] if t.get("title_has") for k in t["keywords"]}
+TITLE_REQUIRED = CONTEXT_KWS | {"한수원(주)", "한국수력원자력주식회사"} | set(KW_TITLE_HAS)
 
 
 def _stem(kw):
@@ -82,6 +83,8 @@ def title_relevant(kw, title):
     ('한수원'이 제목에 있다는 것만으로는 부족하다: 한수원 기사는 거의 다 그렇고, 구글은 페이지 옆 목록의 글자까지 읽어
     인재개발원 같은 단어가 본문에 없는 기사도 결과에 넣는다.)"""
     t = re.sub(r"\s+", "", title)
+    if kw in KW_TITLE_HAS:  # 본부 탭: 제목에 그 본부 이름(새울·한울·고리·한빛·월성)이 있어야 한다
+        return any(h in t for h in KW_TITLE_HAS[kw])
     if kw in NAME_IS_CONTEXT or kw in LENIENT_KWS:
         return any(c in t for c in TABS_CFG["context_terms"])
     return re.sub(r"\s+", "", _stem(kw)) in t

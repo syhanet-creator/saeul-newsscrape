@@ -172,7 +172,7 @@ details.kw{margin-bottom:12px;font-size:13px}details.kw summary{cursor:pointer;c
 <label class="ck" style="margin-top:8px"><input type="checkbox" id="autosum"> 메인 탭은 매주 처음 열 때 자동 요약 (이 브라우저에 보관)</label>
 <details><summary>지난 요약 보기 (<span id="hn">0</span>)</summary><div id="hist"></div></details></div>
 
-<div class="tabsbar"><div class="seg" id="tabs"></div></div>
+<div class="tabsbar"><div class="seg" id="tabs" role="tablist" aria-label="원전본부·사업소 탭"></div></div>
 <div class="bar scroll" id="chips"></div>
 <div class="bar"><input type="text" id="q" placeholder="결과 내 검색 (제목·언론사·기자)">
 <select id="days"><option value="1">최근 1일</option><option value="3">최근 3일</option><option value="7" selected>최근 7일</option><option value="30">최근 30일</option></select>
@@ -212,7 +212,7 @@ function card(a,i){const on=!!scraps[a.link],fresh=Date.now()/1000-a.ts<6*3600;
 
 function tabs(){
  const all=[...TABLIST.map(t=>({id:t.id,name:t.name,main:!!t.main})),{id:'scrap',name:'★ 스크랩'}];
- $('tabs').innerHTML=all.map(t=>`<button class="tab ${tab===t.id?'on':''}${t.main?' main':''}" data-t="${t.id}">${esc(t.name)}<span class="n" id="n_${t.id}"></span></button>`).join('');
+ $('tabs').innerHTML=all.map(t=>`<button class="tab ${tab===t.id?'on':''}${t.main?' main':''}" role="tab" aria-selected="${tab===t.id}" data-t="${t.id}">${esc(t.name)}<span class="n" id="n_${t.id}"></span></button>`).join('');
  document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>switchTab(b.dataset.t));
  setCounts();
  const on=document.querySelector('.tab.on');if(on)on.scrollIntoView({inline:'center',block:'nearest'});
