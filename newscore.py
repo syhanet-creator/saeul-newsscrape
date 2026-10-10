@@ -651,7 +651,7 @@ def collect(days, kws=None, fast=False, use_local=True):
             return SOURCES[:1]
         return SOURCES
     jobs = [(kw, name, fn) for kw in kws for name, fn in sources_for(kw)]
-    merged, failed = {}, {}
+    merged, failed, detail = {}, {}, {}
     with ThreadPoolExecutor(max(1, len(jobs))) as ex:
         futs = [(kw, name, ex.submit(_cached, name, fn, kw, days)) for kw, name, fn in jobs]
     for kw, name, f in futs:
@@ -671,11 +671,12 @@ def collect(days, kws=None, fast=False, use_local=True):
                     merged[key] = a
         except Exception as e:
             failed.setdefault(name, f"{name}: 응답이 느려 일부 결과가 빠졌을 수 있습니다")
+            detail.setdefault(name, f"{type(e).__name__}: {str(e)[:100]} (키워드 {kw})")  # 원인 확인용(화면에는 표시하지 않는다)
     arts = sorted(merged.values(), key=lambda a: a["ts"], reverse=True)
     if not fast and use_local:
         fill_authors(arts)
     cluster(arts)
-    return {"articles": arts, "errors": list(failed.values()), "keywords": kws,
+    return {"articles": arts, "errors": list(failed.values()), "error_detail": detail, "keywords": kws,
             "fetched": datetime.now(KST).strftime("%Y-%m-%d %H:%M:%S")}
 
 
