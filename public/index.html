@@ -296,11 +296,40 @@ async function load(){
   const full=await jget(base);
   if(loadSeq[id]!==my)return;
   if(full.error)throw new Error(full.error);
+  if(t.local){stashUpdate(full);stashMerge(full,+$('days').value)}
   TD[id]=full;show(id);
+  if(t.local)retryLocal(id,0);
   if(id===tab){if(offline)$('meta').innerHTML+='<span class="offline">오프라인 · 저장된 목록</span>';else fetchAuthors()}
  }catch(e){if(loadSeq[id]===my&&id===tab)$('meta').textContent=(TD[id]?'일부만 불러왔습니다: ':'불러오기 실패: ')+e}
  finally{if(loadSeq[id]===my){loading[id]=false;if(id===tab)$('re').disabled=false}}
 }
+
+/* ---------- 울산뉴스넷·울주신문: 서버가 그 사이트에 못 닿은 날에도 티 나지 않게 이어 보여 준다 ---------- */
+const LOCAL_SRC=['울산뉴스넷','울주신문'];
+const failedLocal=d=>(d.errors||[]).some(e=>LOCAL_SRC.some(s=>e.startsWith(s)));
+const localCount=d=>d.articles.filter(a=>LOCAL_SRC.includes(a.source)).length;
+function stashUpdate(d){                       /* 이번 응답의 두 신문 기사를 이 브라우저에 기억해 둔다(30일) */
+ const m=store.get('lstash',{}),now=Date.now()/1000;
+ d.articles.forEach(a=>{if(LOCAL_SRC.includes(a.source)&&!String(a.gid).startsWith('ls'))m[a.link]=a});
+ for(const k in m)if(now-m[k].ts>30*86400)delete m[k];
+ store.set('lstash',m)}
+function stashMerge(d,days){                   /* 서버가 못 닿았으면(오류) 기억해 둔 기사를 채워 넣는다 */
+ if(!failedLocal(d))return d;
+ const m=store.get('lstash',{}),have=new Set(d.articles.map(a=>a.link)),lim=Date.now()/1000-days*86400,ks=new Set(d.keywords||[]);
+ let n=0;for(const k in m){const a=m[k];if(!have.has(k)&&a.ts>=lim&&(a.kws||[]).some(x=>ks.has(x))){d.articles.push({...a,gid:'ls'+k});n++}}
+ if(n)d.articles.sort((a,b)=>b.ts-a.ts);return d}
+function retryLocal(id,tries){                 /* 오류가 나면 뒤에서 조용히 다시 요청한다(다른 서버에 닿으면 성공할 수 있다) */
+ const d=TD[id];if(!d||tries>=2||!failedLocal(d))return;
+ setTimeout(async()=>{
+  if(TD[id]!==d)return;
+  try{
+   const days=$('days').value,r=await (await fetch('/api/news?tab='+id+'&days='+days+'&r='+(tries+1)+'&_='+Date.now())).json();
+   if(r.error||TD[id]!==d)return;
+   stashUpdate(r);stashMerge(r,+days);
+   if(!failedLocal(r)||localCount(r)>localCount(d)){TD[id]=r;if(id===tab){show(id)}retryLocal(id,tries+1)}   /* 성공했거나 더 많이 얻었을 때만 바꾼다 */
+   else retryLocal(id,tries+1)
+  }catch(e){}
+ },tries===0?25000:60000)}
 
 /* ---------- 스크랩 내보내기 ---------- */
 function scrapList(){return Object.values(scraps).sort((a,b)=>b.ts-a.ts)}

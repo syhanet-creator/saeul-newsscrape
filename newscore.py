@@ -394,7 +394,7 @@ def _cached(name, fn, kw, days, ttl=120):
             # 지역 신문은 같은 사이트에 요청을 동시에 많이 보내지 않는다. 429 면 한 번 더 시도하고,
             # 응답이 없으면(시간 초과) 그 출처를 1분간 건너뛴다 -> 느린 사이트 하나가 전체를 붙잡지 못한다.
             with _locks[name]:
-                if name not in PATIENT_SOURCES and time.time() < _down.get(name, 0):  # 차례를 기다리는 사이 다른 요청이 이미 실패했다면 바로 포기
+                if time.time() < _down.get(name, 0):  # 차례를 기다리는 사이 다른 요청이 이미 실패했다면 바로 포기
                     raise TimeoutError(f"{name} 일시 중단")
                 for attempt in (0, 1):
                     try:
@@ -405,8 +405,8 @@ def _cached(name, fn, kw, days, ttl=120):
                             raise
                         time.sleep(1.5)
                     except (TimeoutError, urllib.error.URLError):
-                        if name not in PATIENT_SOURCES:
-                            _down[name] = time.time() + 60
+                        # 다른 출처는 1분, 오래 기다리는 두 신문은 20초만 건너뛰고 다시 시도한다
+                        _down[name] = time.time() + (20 if name in PATIENT_SOURCES else 60)
                         raise
                 time.sleep(0.1)
     except Exception:
