@@ -71,10 +71,20 @@ def _stem(kw):
     return kw
 
 
+NAME_IS_CONTEXT = {"한수원(주)", "한국수력원자력주식회사"}  # 이 둘은 회사 이름 자체라 '한수원/한국수력원자력'이 제목에 있으면 인정
+# 기사 본문에 행사 장소·주최 기관으로 자주 나오지만 제목에는 거의 안 나오는 기관(원문 확인: "서울 방사선보건원에서 설명회 개최",
+# "한수원 중앙연구원 관계자는"). 이 키워드는 제목에 한수원/한국수력원자력이 있으면 인정한다.
+LENIENT_KWS = {"중앙연구원", "방사선보건원"}
+
+
 def title_relevant(kw, title):
-    """제목에 한수원/한국수력원자력이 있거나 키워드(앞부분)가 있으면 관련 기사로 본다. 공백은 무시한다."""
+    """제목에 키워드(시설 이름 앞부분)가 있어야 관련 기사로 본다. 공백은 무시한다.
+    ('한수원'이 제목에 있다는 것만으로는 부족하다: 한수원 기사는 거의 다 그렇고, 구글은 페이지 옆 목록의 글자까지 읽어
+    인재개발원 같은 단어가 본문에 없는 기사도 결과에 넣는다.)"""
     t = re.sub(r"\s+", "", title)
-    return re.sub(r"\s+", "", _stem(kw)) in t or any(c in t for c in TABS_CFG["context_terms"])
+    if kw in NAME_IS_CONTEXT or kw in LENIENT_KWS:
+        return any(c in t for c in TABS_CFG["context_terms"])
+    return re.sub(r"\s+", "", _stem(kw)) in t
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) NewsScrap/1.0"
 KST = timezone(timedelta(hours=9))
 SIM_THRESHOLD = 0.4
