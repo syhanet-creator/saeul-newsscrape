@@ -460,16 +460,32 @@ function wxDraw(){
  $('wx').innerHTML=w.sites.map(s=>`<div class="wxc"><div class="nm">${esc(s.name)}</div><div class="tp">${s.icon} ${nz(s.temp)}°<small>${esc(s.text)}</small></div><div class="ds">체감 ${nz(s.feels)}° · 습도 ${nz(s.humidity)}%</div><div class="ds">바람 ${nz(s.wind)}m/s · 강수 ${nz(s.rain)}mm</div></div>`).join('');
  $('wxn').textContent='현재 날씨 · Open-Meteo 기준(시설 소재지 대략 위치)'+(w.fetchedAt?' · '+new Date(w.fetchedAt).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})+' 갱신':'');
 }
+const WMO={0:['☀️','맑음'],1:['🌤️','대체로 맑음'],2:['⛅','구름 조금'],3:['☁️','흐림'],45:['🌫️','안개'],48:['🌫️','안개'],51:['🌦️','이슬비'],53:['🌦️','이슬비'],55:['🌦️','이슬비'],
+ 56:['🌧️','어는 비'],57:['🌧️','어는 비'],61:['🌧️','비'],63:['🌧️','비'],65:['🌧️','강한 비'],66:['🌧️','어는 비'],67:['🌧️','어는 비'],71:['🌨️','눈'],73:['🌨️','눈'],75:['❄️','강한 눈'],
+ 77:['🌨️','싸락눈'],80:['🌦️','소나기'],81:['🌦️','소나기'],82:['⛈️','강한 소나기'],85:['🌨️','눈 소나기'],86:['🌨️','눈 소나기'],95:['⛈️','뇌우'],96:['⛈️','뇌우·우박'],99:['⛈️','뇌우·우박']};
+let WXS={};   /* 탭 id -> [{name,lat,lon}] (서버가 /api/tabs 로 내려 줌) */
+/* 서버(/api/weather)가 안 될 때: 브라우저가 Open-Meteo 를 직접 부른다(CORS 허용). */
+async function wxDirect(id){
+ const sites=WXS[id]||[];if(!sites.length)return {tab:id,sites:[]};
+ const q=new URLSearchParams({latitude:sites.map(s=>s.lat).join(','),longitude:sites.map(s=>s.lon).join(','),
+  current:'temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,weather_code,wind_speed_10m',wind_speed_unit:'ms',timezone:'auto'});
+ const r=await fetch('https://api.open-meteo.com/v1/forecast?'+q);if(!r.ok)throw new Error('Open-Meteo '+r.status);
+ const j=await r.json(),arr=Array.isArray(j)?j:[j];
+ return {tab:id,sites:sites.map((s,i)=>{const c=(arr[i]||{}).current||{},w=WMO[c.weather_code]||['🌡️','–'];
+  return {name:s.name,icon:w[0],text:w[1],temp:c.temperature_2m,feels:c.apparent_temperature,humidity:c.relative_humidity_2m,rain:c.precipitation,wind:c.wind_speed_10m}})};
+}
 async function wxLoad(){
  const id=tab;if(id==='scrap'){wxDraw();return}
  const fresh=WX[id]&&Date.now()-WX[id].fetchedAt<9*60e3;
  if(fresh){wxDraw();return}
- try{
-  const r=await (await fetch('/api/weather?tab='+id)).json();
-  if(r.error||!r.sites)throw new Error(r.error||'x');
-  r.fetchedAt=Date.now();WX[id]=r;
- }catch(e){}   /* 실패하면 이전 값(있으면)을 그대로 두고 날씨 줄만 비운다 */
- if(id===tab)wxDraw();
+ let r=null,why='';
+ try{const x=await fetch('/api/weather?tab='+id);if(!x.ok)throw new Error('서버 '+x.status);r=await x.json();if(r.error||!r.sites)throw new Error(r.error||'응답 형식 오류')}
+ catch(e){why=e.message;r=null;
+  try{r=await wxDirect(id)}catch(e2){why+=' / '+e2.message;r=null}}
+ if(r){r.fetchedAt=Date.now();WX[id]=r}
+ if(id!==tab)return;
+ if(!r&&!WX[id]&&(WXS[id]||[]).length){$('wx').innerHTML='';$('wxn').textContent='⚠ 날씨를 불러오지 못했습니다 ('+why+')';return}
+ wxDraw();
 }
 setInterval(()=>{if(document.visibilityState==='visible')wxLoad()},10*60e3);
 addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')wxLoad()});
@@ -486,7 +502,7 @@ addEventListener('online',()=>{if(document.visibilityState==='visible')load()});
 (async()=>{
  let cfg;
  try{cfg=await (await fetch('/api/tabs')).json()}catch(e){$('meta').textContent='탭 정보를 불러오지 못했습니다. 새로고침해 보세요.';$('list').innerHTML='';return}
- TABLIST=cfg.tabs;TABMAP=Object.fromEntries(TABLIST.map(t=>[t.id,t]));MAIN=(TABLIST.find(t=>t.main)||TABLIST[0]).id;
+ TABLIST=cfg.tabs;WXS=cfg.weather_sites||{};TABMAP=Object.fromEntries(TABLIST.map(t=>[t.id,t]));MAIN=(TABLIST.find(t=>t.main)||TABLIST[0]).id;
  const q=new URLSearchParams(location.search).get('tab');tab=(TABMAP[q]||q==='scrap')?q:MAIN;
  tabs();$('sumcard').style.display=tab==='scrap'?'none':'';summaryShow();wxLoad();
  if(tab==='scrap'){chips();render()}else{chips();await load()}

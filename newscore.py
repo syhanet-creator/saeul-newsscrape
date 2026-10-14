@@ -66,6 +66,8 @@ WEATHER_SITES = {
                  ("인재개발원(경주)", 35.7437, 129.4780)],
 }
 WEATHER_SITES["all"] = WEATHER_SITES["khnp"]
+# 화면이 서버 호출에 실패했을 때 브라우저가 직접 조회할 수 있도록 지점 좌표를 탭 설정에 함께 내려 준다.
+TABS_CFG["weather_sites"] = {k: [{"name": n, "lat": la, "lon": lo} for n, la, lo in v] for k, v in WEATHER_SITES.items()}
 
 # WMO 날씨 코드 -> (이모지, 한글)
 _WMO = {0: ("☀️", "맑음"), 1: ("🌤️", "대체로 맑음"), 2: ("⛅", "구름 조금"), 3: ("☁️", "흐림"),
