@@ -15,6 +15,10 @@
     "api/tabs.py": {
       "maxDuration": 10,
       "includeFiles": "newscore.py"
+    },
+    "api/weather.py": {
+      "maxDuration": 15,
+      "includeFiles": "newscore.py"
     }
   },
   "headers": [

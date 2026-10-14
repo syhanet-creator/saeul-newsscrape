@@ -47,6 +47,64 @@ TABS_CFG = {
         {"id": "etc", "context": True, "name": "기타 사업소", "keywords": ["구매기술센터", "공간디자인센터"]},
     ],
 }
+# ---------- 사업소 날씨: 탭 id -> [(표시 이름, 위도, 경도)] (시설 소재지 기준 대략 위치) ----------
+WEATHER_SITES = {
+    "saeul": [("새울본부(울주)", 35.3205, 129.3027)],
+    "hanul": [("한울본부(울진)", 37.0925, 129.3836)],
+    "kori": [("고리본부(기장)", 35.3194, 129.2899)],
+    "hanbit": [("한빛본부(영광)", 35.4115, 126.4235)],
+    "wolsong": [("월성본부(경주)", 35.7125, 129.4753)],
+    "khnp": [("본사(경주)", 35.7437, 129.4780), ("새울", 35.3205, 129.3027), ("고리", 35.3194, 129.2899),
+             ("월성", 35.7125, 129.4753), ("한울", 37.0925, 129.3836), ("한빛", 35.4115, 126.4235)],
+    "overseas": [("바라카(UAE)", 23.9588, 52.2606), ("엘다바(이집트)", 31.0300, 28.4500),
+                 ("체르나보다(루마니아)", 44.3263, 28.0572), ("두코바니(체코)", 48.9544, 16.1486)],
+    "pumped": [("영동", 36.1700, 127.7800), ("홍천", 37.6900, 127.8900), ("포천", 37.9900, 127.3500)],
+    "hydro": [("청평", 37.7355, 127.4210), ("삼랑진", 35.3897, 128.8350), ("무주", 35.9000, 127.6000),
+              ("산청", 35.3000, 127.8000), ("양양", 37.9000, 128.6000), ("청송", 36.4000, 129.1000),
+              ("예천", 36.6000, 128.5000)],
+    "research": [("중앙연구원(대전)", 36.3700, 127.3700), ("방사선보건원(서울)", 37.6300, 127.0800),
+                 ("인재개발원(경주)", 35.7437, 129.4780)],
+}
+WEATHER_SITES["all"] = WEATHER_SITES["khnp"]
+
+# WMO 날씨 코드 -> (이모지, 한글)
+_WMO = {0: ("☀️", "맑음"), 1: ("🌤️", "대체로 맑음"), 2: ("⛅", "구름 조금"), 3: ("☁️", "흐림"),
+        45: ("🌫️", "안개"), 48: ("🌫️", "안개"), 51: ("🌦️", "이슬비"), 53: ("🌦️", "이슬비"), 55: ("🌦️", "이슬비"),
+        56: ("🌧️", "어는 비"), 57: ("🌧️", "어는 비"), 61: ("🌧️", "비"), 63: ("🌧️", "비"), 65: ("🌧️", "강한 비"),
+        66: ("🌧️", "어는 비"), 67: ("🌧️", "어는 비"), 71: ("🌨️", "눈"), 73: ("🌨️", "눈"), 75: ("❄️", "강한 눈"),
+        77: ("🌨️", "싸락눈"), 80: ("🌦️", "소나기"), 81: ("🌦️", "소나기"), 82: ("⛈️", "강한 소나기"),
+        85: ("🌨️", "눈 소나기"), 86: ("🌨️", "눈 소나기"), 95: ("⛈️", "뇌우"), 96: ("⛈️", "뇌우·우박"), 99: ("⛈️", "뇌우·우박")}
+
+
+def weather_for(tab):
+    """탭의 사업소 현재 날씨(Open-Meteo, 키 불필요). -> {"tab", "sites":[...], "updated"} 또는 {"error"}"""
+    sites = WEATHER_SITES.get(tab)
+    if not sites:
+        return {"tab": tab, "sites": []}
+    q = urllib.parse.urlencode({
+        "latitude": ",".join(str(x[1]) for x in sites), "longitude": ",".join(str(x[2]) for x in sites),
+        "current": "temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,weather_code,wind_speed_10m",
+        "wind_speed_unit": "ms", "timezone": "auto"})
+    try:
+        req = urllib.request.Request("https://api.open-meteo.com/v1/forecast?" + q, headers={"User-Agent": "khnp-news-scrap"})
+        raw = json.loads(urllib.request.urlopen(req, timeout=8).read().decode())
+    except Exception as e:
+        return {"error": "날씨를 불러오지 못했습니다 (%s)" % type(e).__name__}
+    return {"tab": tab, "sites": _weather_rows(sites, raw), "updated": datetime.now(timezone.utc).isoformat(timespec="seconds")}
+
+
+def _weather_rows(sites, raw):
+    raw = raw if isinstance(raw, list) else [raw]
+    rows = []
+    for (name, _lat, _lon), r in zip(sites, raw):
+        c = (r or {}).get("current") or {}
+        icon, text = _WMO.get(c.get("weather_code"), ("🌡️", "–"))
+        rows.append({"name": name, "icon": icon, "text": text, "temp": c.get("temperature_2m"),
+                     "feels": c.get("apparent_temperature"), "humidity": c.get("relative_humidity_2m"),
+                     "rain": c.get("precipitation"), "wind": c.get("wind_speed_10m"), "time": c.get("time")})
+    return rows
+
+
 _all_kws = []
 for _t in TABS_CFG["tabs"]:
     if not _t.get("all"):

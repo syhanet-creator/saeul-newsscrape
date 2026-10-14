@@ -144,6 +144,14 @@ details.kw{margin-bottom:12px;font-size:13px}details.kw summary{cursor:pointer;c
 .seg.dragging .tab,#chips.dragging .chip{pointer-events:none}
 .seg,#chips{touch-action:pan-y;overscroll-behavior-x:contain}
 @media(pointer:coarse){.seg,#chips{cursor:auto}}
+/* ---------- 사업소 날씨 ---------- */
+.wx{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin:0 0 12px;padding:2px 1px 4px}.wx::-webkit-scrollbar{display:none}
+.wx:empty{display:none}
+.wxc{flex:0 0 auto;min-width:118px;background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:9px 12px;box-shadow:var(--shadow)}
+.wxc .nm{font-size:12px;color:var(--mut);font-weight:700;white-space:nowrap}
+.wxc .tp{font-size:22px;font-weight:800;line-height:1.2;letter-spacing:-.02em}.wxc .tp small{font-size:12px;font-weight:600;color:var(--mut);margin-left:4px}
+.wxc .ds{font-size:12px;color:var(--mut);white-space:nowrap}
+.wxn{font-size:11.5px;color:var(--mut);margin:-6px 0 12px}
 </style></head><body>
 
 <header class="hero">
@@ -174,6 +182,7 @@ details.kw{margin-bottom:12px;font-size:13px}details.kw summary{cursor:pointer;c
 <details><summary>지난 요약 보기 (<span id="hn">0</span>)</summary><div id="hist"></div></details></div>
 
 <div class="tabsbar"><div class="seg" id="tabs" role="tablist" aria-label="원전본부·사업소 탭"></div></div>
+<div class="wx" id="wx" aria-label="사업소 현재 날씨"></div><div class="wxn" id="wxn"></div>
 <div class="bar scroll" id="chips"></div>
 <div class="bar"><input type="text" id="q" placeholder="결과 내 검색 (제목·언론사·기자)">
 <select id="days"><option value="1">최근 1일</option><option value="3">최근 3일</option><option value="7" selected>최근 7일</option><option value="30">최근 30일</option></select>
@@ -271,7 +280,7 @@ function switchTab(id){
  if(id===tab)return;
  tab=id;active=new Set();$('q').value='';
  try{history.replaceState(null,'','?tab='+id)}catch(e){}
- tabs();$('sumcard').style.display=id==='scrap'?'none':'';
+ tabs();$('sumcard').style.display=id==='scrap'?'none':'';wxDraw();wxLoad();
  $('re').disabled=!!loading[id];
  if(id==='scrap'){chips();render();return}
  summaryShow();
@@ -441,6 +450,30 @@ function dragScroll(el){
 }
 dragScroll($('tabs'));dragScroll($('chips'));
 
+
+/* ---------- 사업소 날씨 (/api/weather, 10분마다 갱신) ---------- */
+const WX={};
+const nz=v=>v==null?'–':Math.round(v*10)/10;
+function wxDraw(){
+ const w=WX[tab];
+ if(tab==='scrap'||!w||!w.sites||!w.sites.length){$('wx').innerHTML='';$('wxn').textContent='';return}
+ $('wx').innerHTML=w.sites.map(s=>`<div class="wxc"><div class="nm">${esc(s.name)}</div><div class="tp">${s.icon} ${nz(s.temp)}°<small>${esc(s.text)}</small></div><div class="ds">체감 ${nz(s.feels)}° · 습도 ${nz(s.humidity)}%</div><div class="ds">바람 ${nz(s.wind)}m/s · 강수 ${nz(s.rain)}mm</div></div>`).join('');
+ $('wxn').textContent='현재 날씨 · Open-Meteo 기준(시설 소재지 대략 위치)'+(w.fetchedAt?' · '+new Date(w.fetchedAt).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})+' 갱신':'');
+}
+async function wxLoad(){
+ const id=tab;if(id==='scrap'){wxDraw();return}
+ const fresh=WX[id]&&Date.now()-WX[id].fetchedAt<9*60e3;
+ if(fresh){wxDraw();return}
+ try{
+  const r=await (await fetch('/api/weather?tab='+id)).json();
+  if(r.error||!r.sites)throw new Error(r.error||'x');
+  r.fetchedAt=Date.now();WX[id]=r;
+ }catch(e){}   /* 실패하면 이전 값(있으면)을 그대로 두고 날씨 줄만 비운다 */
+ if(id===tab)wxDraw();
+}
+setInterval(()=>{if(document.visibilityState==='visible')wxLoad()},10*60e3);
+addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')wxLoad()});
+
 /* ---------- PWA: 서비스 워커·설치 버튼 ---------- */
 if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));
 let installEv=null;
@@ -455,7 +488,7 @@ addEventListener('online',()=>{if(document.visibilityState==='visible')load()});
  try{cfg=await (await fetch('/api/tabs')).json()}catch(e){$('meta').textContent='탭 정보를 불러오지 못했습니다. 새로고침해 보세요.';$('list').innerHTML='';return}
  TABLIST=cfg.tabs;TABMAP=Object.fromEntries(TABLIST.map(t=>[t.id,t]));MAIN=(TABLIST.find(t=>t.main)||TABLIST[0]).id;
  const q=new URLSearchParams(location.search).get('tab');tab=(TABMAP[q]||q==='scrap')?q:MAIN;
- tabs();$('sumcard').style.display=tab==='scrap'?'none':'';summaryShow();
+ tabs();$('sumcard').style.display=tab==='scrap'?'none':'';summaryShow();wxLoad();
  if(tab==='scrap'){chips();render()}else{chips();await load()}
  if(tab===MAIN&&$('autosum').checked&&store.get('sumweek','')!==weekId())summarize(true);
 })();

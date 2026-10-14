@@ -20,7 +20,8 @@ TYPES = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=u
          ".json": "application/json; charset=utf-8"}
 ROUTES = {"/api/news": lambda d, k, f, t: newscore.collect_tab(t or newscore.MAIN_TAB, d, fast=f),
           "/api/summary": lambda d, k, f, t: newscore.weekly_summary(7, t or newscore.MAIN_TAB),
-          "/api/tabs": lambda d, k, f, t: newscore.TABS_CFG}
+          "/api/tabs": lambda d, k, f, t: newscore.TABS_CFG,
+          "/api/weather": lambda d, k, f, t: newscore.weather_for(t or newscore.MAIN_TAB)}
 
 
 class Handler(BaseHTTPRequestHandler):
