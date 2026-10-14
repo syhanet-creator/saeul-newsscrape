@@ -48,4 +48,5 @@ python news_scrap.py
   - 환경변수 `GEMINI_API_KEY`(Google AI Studio 무료 키) 또는 `ANTHROPIC_API_KEY` 중 하나 필요. 둘 다 있으면 Gemini 우선
   - 로컬: `$env:GEMINI_API_KEY="..."` 후 실행 / Vercel: Project Settings -> Environment Variables 추가 후 Redeploy
   - 모델 변경: `GEMINI_MODEL`, `SUMMARY_MODEL`(Claude)
+- 사업소 현재 날씨: 탭마다 해당 본부·사업소 소재지의 기온·체감·습도·바람·강수를 카드로 표시(Open-Meteo, 키 불필요). `/api/weather` 가 조회해 CDN 에서 10분 공유하고, 서버 호출이 실패하면 브라우저가 직접 조회합니다. 지점은 `newscore.py` 의 `WEATHER_SITES` 에서 수정
 - 모바일 최적화·PWA(홈 화면 설치, 오프라인에서 마지막 목록)
