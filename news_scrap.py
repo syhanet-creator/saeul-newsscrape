@@ -11,6 +11,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import newscore
+from api import _npp
 from api._common import author_response, parse_query
 
 PORT = 8765
@@ -21,7 +22,8 @@ TYPES = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=u
 ROUTES = {"/api/news": lambda d, k, f, t: newscore.collect_tab(t or newscore.MAIN_TAB, d, fast=f),
           "/api/summary": lambda d, k, f, t: newscore.weekly_summary(7, t or newscore.MAIN_TAB),
           "/api/tabs": lambda d, k, f, t: newscore.TABS_CFG,
-          "/api/weather": lambda d, k, f, t: newscore.weather_for(t or newscore.MAIN_TAB)}
+          "/api/weather": lambda d, k, f, t: newscore.weather_for(t or newscore.MAIN_TAB),
+          "/api/npp": lambda d, k, f, t: _npp.fetch_all()}
 
 
 class Handler(BaseHTTPRequestHandler):

@@ -19,6 +19,10 @@
     "api/weather.py": {
       "maxDuration": 15,
       "includeFiles": "newscore.py"
+    },
+    "api/npp.py": {
+      "maxDuration": 30,
+      "includeFiles": "api/_npp.py"
     }
   },
   "headers": [

@@ -144,6 +144,24 @@ details.kw{margin-bottom:12px;font-size:13px}details.kw summary{cursor:pointer;c
 .seg.dragging .tab,#chips.dragging .chip{pointer-events:none}
 .seg,#chips{touch-action:pan-y;overscroll-behavior-x:contain}
 @media(pointer:coarse){.seg,#chips{cursor:auto}}
+/* ---------- 열린원전운영정보 실시간 패널 ---------- */
+.np{background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:14px 16px;margin-bottom:16px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+.np:before{content:"";position:absolute;left:0;right:0;top:0;height:4px;background:linear-gradient(90deg,var(--teal),var(--sky),var(--blue))}
+.nph{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:2px 0 10px}.nph b{font-size:15.5px;font-weight:800}
+.nph a{font-size:12.5px;color:var(--ac);text-decoration:none;white-space:nowrap;font-weight:700}
+.npk{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
+.npk div{background:var(--ac-soft);border-radius:10px;padding:8px 10px}.npk span{display:block;font-size:11.5px;color:var(--mut)}.npk b{font-size:17px;font-weight:800;letter-spacing:-.02em}.npk small{font-size:11.5px;font-weight:700;color:var(--mut);margin-left:3px}
+.npt{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin-bottom:10px}.npt::-webkit-scrollbar{display:none}
+.npt button{flex:0 0 auto;border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:999px;padding:5px 12px;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+.npt button small{color:var(--mut);font-weight:600;margin-left:4px}.npt button.on{background:var(--ac);border-color:var(--ac);color:#fff}.npt button.on small{color:#dcebfa}
+.npu{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:6px}
+.npu div{border:1px solid var(--bd);border-radius:10px;padding:7px 9px;font-size:12px;color:var(--mut)}
+.npu div b{display:block;font-size:13.5px;color:var(--tx)}.npu div i{font-style:normal;font-weight:800;font-size:15px;color:var(--tx)}
+.npu div.run b:before{content:"●";color:#12a150;margin-right:4px}.npu div.stop b:before{content:"▲";color:#e39200;margin-right:4px}.npu div.stop{background:rgba(227,146,0,.08)}
+.npi{font-size:13px;margin:10px 0 6px}
+.npm{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--mut)}.npm b{color:var(--tx)}
+.npn{font-size:11.5px;color:var(--mut);margin-top:8px}
+@media(max-width:560px){.npk b{font-size:15px}}
 /* ---------- 사업소 날씨 ---------- */
 .wx{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin:0 0 12px;padding:2px 1px 4px}.wx::-webkit-scrollbar{display:none}
 .wx:empty{display:none}
@@ -169,6 +187,7 @@ details.kw{margin-bottom:12px;font-size:13px}details.kw summary{cursor:pointer;c
 </header>
 
 <div class="wrap">
+<section class="np" id="np" aria-label="열린원전운영정보 실시간 운영현황"><div class="nph"><b>⚛ 열린원전운영정보 · 실시간 운영현황</b><a href="https://npp.khnp.co.kr/" target="_blank" rel="noopener">원문 ↗</a></div><div id="npbody" class="npn">불러오는 중…</div></section>
 <div class="kpis">
  <div class="kpi"><b id="k1">–</b><span>기사</span></div>
  <div class="kpi k2"><b id="k2">–</b><span>오늘 신규</span></div>
@@ -489,6 +508,41 @@ async function wxLoad(){
 }
 setInterval(()=>{if(document.visibilityState==='visible')wxLoad()},10*60e3);
 addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')wxLoad()});
+
+
+/* ---------- 열린원전운영정보 실시간 패널 (/api/npp, 5분마다 갱신) ---------- */
+let NP=null,npSel=store.get('npSel','새울');
+const NPORD=['새울','고리','월성','한울','한빛'];
+const npf=(v,d)=>v==null?'–':Number(v).toLocaleString('ko-KR',{maximumFractionDigits:d==null?0:d});
+function npDraw(){
+ const box=$('npbody');
+ if(!NP){return}
+ if(NP.error){box.className='npn';box.innerHTML='⚠ '+esc(NP.error)+' · <a href="https://npp.khnp.co.kr/" target="_blank" rel="noopener">원문 열기</a>';return}
+ const sm=NP.summary||{},br=NP.branches||{};
+ if(!br[npSel])npSel=NPORD.find(n=>br[n])||Object.keys(br)[0];
+ const b=br[npSel]||{units:[]};
+ const run=u=>u.state==='운영중';
+ const tabs=NPORD.filter(n=>br[n]).map(n=>{const us=br[n].units||[];return `<button data-b="${esc(n)}" class="${n===npSel?'on':''}">${esc(n)}<small>${us.filter(run).length}/${us.length}</small></button>`}).join('');
+ const units=(b.units||[]).map(u=>run(u)
+  ?`<div class="run"><b>${esc(u.name)}</b><i>${npf(u.reactor_pct,1)}%</i><br>${npf(u.gen_mwe)} MWe</div>`
+  :`<div class="stop"><b>${esc(u.name)}</b>정비중</div>`).join('');
+ const r=b.radiation,w=b.weather;
+ const meta=[r?`방사선량 <b>${esc(r.status)} (${npf(r.max,3)} μSv/h)</b>`:'',
+  w&&w.temp!=null?`기온 <b>${npf(w.temp,1)}℃</b> · 습도 <b>${npf(w.humidity,1)}%</b> · 풍속 <b>${npf(w.wind,1)}m/s</b> · 강수 <b>${npf(w.rain,1)}mm</b>`:'',
+  w&&w.time?`측정 ${esc(w.time)}`:''].filter(Boolean).map(x=>`<span>${x}</span>`).join('');
+ box.className='';
+ box.innerHTML=`<div class="npk"><div><span>원자력 설비용량</span><b>${esc(sm.capacity||'–')}</b></div><div><span>원자력 발전량</span><b>${esc(sm.generation||'–')}</b></div><div><span>운영현황</span><b>${sm.running!=null?sm.running:'–'}<small>/ ${sm.total!=null?sm.total:'–'}기 운전중</small></b></div></div>
+ <div class="npt" id="npt">${tabs}</div><div class="npu">${units}</div>${b.info?`<div class="npi">${esc(b.info)}</div>`:''}<div class="npm">${meta}</div>
+ <div class="npn">출처: 한국수력원자력 열린원전운영정보(npp.khnp.co.kr) · ${esc(NP.fetched||'')} 조회${NP.errors&&NP.errors.length?' · 일부 항목 불러오기 실패':''}</div>`;
+ document.querySelectorAll('#npt button').forEach(x=>x.onclick=()=>{npSel=x.dataset.b;store.set('npSel',npSel);npDraw()});
+}
+async function npLoad(){
+ try{const r=await fetch('/api/npp');if(!r.ok)throw new Error('서버 '+r.status);NP=await r.json()}
+ catch(e){if(!NP)NP={error:'운영정보를 불러오지 못했습니다 ('+e.message+')'}}
+ npDraw();
+}
+npLoad();
+setInterval(()=>{if(document.visibilityState==='visible')npLoad()},5*60e3);
 
 /* ---------- PWA: 서비스 워커·설치 버튼 ---------- */
 if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));
