@@ -305,7 +305,7 @@ function show(id){            /* id 탭의 데이터를 화면에 그린다(그 
  if(id!==tab)return;data=TD[id];applyAuthors();chips();render()}
 function switchTab(id){
  if(id===tab)return;
- tab=id;active=new Set();$('q').value='';
+ tab=id;active=new Set();$('q').value='';npFollow(id);
  try{history.replaceState(null,'','?tab='+id)}catch(e){}
  tabs();$('sumcard').style.display=id==='scrap'?'none':'';wxDraw();wxLoad();
  $('re').disabled=!!loading[id];
@@ -521,6 +521,8 @@ addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'
 /* ---------- 열린원전운영정보 실시간 패널 (/api/npp, 5분마다 갱신) ---------- */
 let NP=null,npSel=store.get('npSel','새울');
 const NPORD=['새울','고리','월성','한울','한빛'];
+const NPTAB={saeul:'새울',hanul:'한울',kori:'고리',hanbit:'한빛',wolsong:'월성'};   /* 원전본부 기사 탭을 고르면 운영정보도 그 본부로 */
+function npFollow(id){const n=NPTAB[id];if(n&&n!==npSel){npSel=n;npDraw()}}   /* 직접 고른 선택은 저장하지만, 탭을 따라 바뀐 것은 저장하지 않는다 */
 const npf=(v,d)=>v==null?'–':Number(v).toLocaleString('ko-KR',{maximumFractionDigits:d==null?0:d});
 function npDraw(){
  const box=$('npbody');
@@ -593,7 +595,7 @@ addEventListener('online',()=>{if(document.visibilityState==='visible')load()});
  let cfg;
  try{cfg=await (await fetch('/api/tabs')).json()}catch(e){$('meta').textContent='탭 정보를 불러오지 못했습니다. 새로고침해 보세요.';$('list').innerHTML='';return}
  TABLIST=cfg.tabs;WXS=cfg.weather_sites||{};TABMAP=Object.fromEntries(TABLIST.map(t=>[t.id,t]));MAIN=(TABLIST.find(t=>t.main)||TABLIST[0]).id;
- const q=new URLSearchParams(location.search).get('tab');tab=(TABMAP[q]||q==='scrap')?q:MAIN;
+ const q=new URLSearchParams(location.search).get('tab');tab=(TABMAP[q]||q==='scrap')?q:MAIN;npFollow(tab);
  tabs();$('sumcard').style.display=tab==='scrap'?'none':'';summaryShow();wxLoad();
  if(tab==='scrap'){chips();render()}else{chips();await load()}
  if(tab===MAIN&&$('autosum').checked&&store.get('sumweek','')!==weekId())summarize(true);
