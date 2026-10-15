@@ -45,7 +45,7 @@ python news_scrap.py
     {
       "image": "/banners/ad1.jpg",
       "link": "https://example.com",
-      "caption": "겸직금지",
+      "caption": "새울본부 홈페이지",
       "active": true,
       "start": "2026-10-20",
       "end": "2026-11-20",
@@ -55,7 +55,7 @@ python news_scrap.py
 }
 ```
 - `image`: `public/banners/` 에 올린 파일(`/banners/파일명`) 또는 https 주소. 가로로 긴 이미지(가로 1200px 안팎) 권장
-- `link`: 누르면 이동할 http(s) 주소(없으면 이동 없음), `caption`: 이미지 아래 작은 문구(선택)
+- `link`: 누르면 이동할 http(s) 주소(없으면 이동 없음), `caption`: 화면에는 보이지 않고 이미지 설명(대체 텍스트)으로만 쓰임(선택). 배너에는 이미지만 표시됩니다
 - `active`: false 면 숨김, `start`/`end`: 노출 기간(날짜만 쓰면 한국 시간, 종료일은 그날 끝까지. 비우면 제한 없음)
 - `sort`: 작을수록 먼저. 노출 배너가 2개 이상이면 6초마다 돌아가며 표시, 0개면 아무것도 보이지 않음
 
