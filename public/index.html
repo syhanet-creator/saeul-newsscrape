@@ -545,6 +545,8 @@ function npDraw(){
  <div class="npt" id="npt">${tabs}</div><div class="npu">${units}</div>${b.info?`<div class="npi">${esc(b.info)}</div>`:''}<div class="npm">${meta}</div>
  <div class="npn">출처: 한국수력원자력 열린원전운영정보(npp.khnp.co.kr) · ${esc(NP.fetched||'')} 조회${NP.errors&&NP.errors.length?' · 일부 항목 불러오기 실패':''}</div>`;
  document.querySelectorAll('#npt button').forEach(x=>x.onclick=()=>{npSel=x.dataset.b;store.set('npSel',npSel);npDraw()});
+ const t=$('npt'),on=t&&t.querySelector('button.on');   /* 선택한 본부 버튼이 옆으로 밀려 안 보이면 이 줄만 가로로 밀어 가운데에 오게(페이지는 움직이지 않음) */
+ if(on)t.scrollLeft=on.offsetLeft-(t.clientWidth-on.offsetWidth)/2;
 }
 async function npLoad(){
  try{const r=await fetch('/api/npp');if(!r.ok)throw new Error('서버 '+r.status);NP=await r.json()}
