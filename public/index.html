@@ -158,9 +158,9 @@ details.kw{margin-bottom:12px;font-size:13px}details.kw summary{cursor:pointer;c
 .nph a{font-size:12.5px;color:var(--ac);text-decoration:none;white-space:nowrap;font-weight:700}
 .npk{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
 .npk div{background:var(--ac-soft);border-radius:10px;padding:8px 10px}.npk span{display:block;font-size:11.5px;color:var(--mut)}.npk b{font-size:17px;font-weight:800;letter-spacing:-.02em}.npk small{font-size:11.5px;font-weight:700;color:var(--mut);margin-left:3px}
-.npt{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin-bottom:10px}.npt::-webkit-scrollbar{display:none}
-.npt button{flex:0 0 auto;border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:999px;padding:5px 12px;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
-.npt button small{color:var(--mut);font-weight:600;margin-left:4px}.npt button.on{background:var(--ac);border-color:var(--ac);color:#fff}.npt button.on small{color:#dcebfa}
+.npt{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin-bottom:10px}   /* 본부 버튼 5개를 옆으로 밀지 않아도 한 줄에 모두 보이게 균등 배치 */
+.npt button{border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:12px;padding:6px 0 5px;font:inherit;font-size:14px;font-weight:800;line-height:1.25;cursor:pointer;text-align:center;white-space:nowrap}
+.npt button small{display:block;color:var(--mut);font-weight:600;font-size:11.5px}.npt button.on{background:var(--ac);border-color:var(--ac);color:#fff}.npt button.on small{color:#dcebfa}
 .npu{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:6px}
 .npu div{border:1px solid var(--bd);border-radius:10px;padding:7px 9px;font-size:12px;color:var(--mut)}
 .npu div b{display:block;font-size:13.5px;color:var(--tx)}.npu div i{font-style:normal;font-weight:800;font-size:15px;color:var(--tx)}
@@ -541,7 +541,7 @@ function npDraw(){
   w&&w.temp!=null?`기온 <b>${npf(w.temp,1)}℃</b> · 습도 <b>${npf(w.humidity,1)}%</b> · 풍속 <b>${npf(w.wind,1)}m/s</b> · 강수 <b>${npf(w.rain,1)}mm</b>`:'',
   w&&w.time?`측정 ${esc(w.time)}`:''].filter(Boolean).map(x=>`<span>${x}</span>`).join('');
  box.className='';
- box.innerHTML=`<div class="npk"><div><span>원자력 설비용량</span><b>${esc(sm.capacity||'–')}</b></div><div><span>원자력 발전량</span><b>${esc(sm.generation||'–')}</b></div><div><span>운영현황</span><b>${sm.running!=null?sm.running:'–'}<small>/ ${sm.total!=null?sm.total:'–'}기 운전중</small></b></div></div>
+ box.innerHTML=`<div class="npk"><div><span>원자력 설비용량</span><b>${esc(sm.capacity||'–')}</b></div><div><span>원자력 발전량</span><b>${esc(sm.generation||'–')}</b></div><div><span>운전중 기수</span><b>${sm.running!=null?sm.running:'–'}<small>/ ${sm.total!=null?sm.total:'–'}기</small></b></div></div>
  <div class="npt" id="npt">${tabs}</div><div class="npu">${units}</div>${b.info?`<div class="npi">${esc(b.info)}</div>`:''}<div class="npm">${meta}</div>
  <div class="npn">출처: 한국수력원자력 열린원전운영정보(npp.khnp.co.kr) · ${esc(NP.fetched||'')} 조회${NP.errors&&NP.errors.length?' · 일부 항목 불러오기 실패':''}</div>`;
  document.querySelectorAll('#npt button').forEach(x=>x.onclick=()=>{npSel=x.dataset.b;store.set('npSel',npSel);npDraw()});
