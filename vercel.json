@@ -1,4 +1,7 @@
 {
+  "regions": [
+    "icn1"
+  ],
   "functions": {
     "api/news.py": {
       "maxDuration": 60,
