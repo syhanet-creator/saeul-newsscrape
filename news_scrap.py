@@ -12,9 +12,6 @@ from pathlib import Path
 
 import newscore
 from api import _npp
-import sys
-sys.path.insert(0, str(Path(__file__).parent / "api"))
-import _admin  # noqa: E402
 from api._common import author_response, parse_query
 
 PORT = 8765
@@ -26,39 +23,15 @@ ROUTES = {"/api/news": lambda d, k, f, t: newscore.collect_tab(t or newscore.MAI
           "/api/summary": lambda d, k, f, t: newscore.weekly_summary(7, t or newscore.MAIN_TAB),
           "/api/tabs": lambda d, k, f, t: newscore.TABS_CFG,
           "/api/weather": lambda d, k, f, t: newscore.weather_for(t or newscore.MAIN_TAB),
-          "/api/npp": lambda d, k, f, t: _npp.fetch_all(),
-          "/api/banners": lambda d, k, f, t: {"banners": _admin.public_banners()}}
+          "/api/npp": lambda d, k, f, t: _npp.fetch_all()}
 
 
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
 
-    def _admin(self, method):
-        n = int(self.headers.get("Content-Length") or 0)
-        status, extra, obj = _admin.handle(method, self.path, self.headers, self.rfile.read(n) if n else b"")
-        raw = json.dumps(obj, ensure_ascii=False, default=str).encode()
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Cache-Control", "no-store")
-        for k, v in extra.items():
-            self.send_header(k, v.replace("; Secure", "") if self.headers.get("Host", "").startswith(("127.0.0.1", "localhost")) else v)
-        self.send_header("Content-Length", str(len(raw)))
-        self.end_headers()
-        self.wfile.write(raw)
-
-    def do_POST(self):
-        if urllib.parse.urlparse(self.path).path == "/api/admin":
-            return self._admin("POST")
-        self.send_error(404)
-
     def do_GET(self):
         u = urllib.parse.urlparse(self.path)
-        if u.path == "/api/admin":
-            return self._admin("GET")
-        if u.path == "/admin":
-            self.path = "/admin.html"
-            u = urllib.parse.urlparse(self.path)
         if u.path == "/api/author":
             return author_response(self, newscore)
         if u.path in ROUTES:

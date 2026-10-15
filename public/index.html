@@ -554,8 +554,14 @@ npLoad();
 setInterval(()=>{if(document.visibilityState==='visible')npLoad()},5*60e3);
 
 
-/* ---------- 상단 광고 배너 (/api/banners, 관리자 페이지 /admin 에서 관리) ---------- */
+/* ---------- 상단 광고 배너 (public/banners.json 으로 관리) ---------- */
 let ADS=[],adI=0,adT=null;
+const KST=(d,end)=>d?new Date(/T/.test(d)?d:d+(end?'T23:59:59+09:00':'T00:00:00+09:00')):null;   /* 날짜만 쓰면 한국 시간 기준(종료일은 그날 끝까지) */
+function adLive(b,now){
+ if(!b||b.active===false||!b.image)return false;
+ if(!/^(\/(?!\/)|https:\/\/)/.test(b.image))return false;       /* 이미지는 이 사이트의 /경로 또는 https 주소만 */
+ const s=KST(b.start),e=KST(b.end,true);
+ return !(s&&now<s)&&!(e&&now>e)}
 function adDraw(){
  const box=$('ad');
  if(!ADS.length){box.hidden=true;return}
@@ -569,8 +575,10 @@ function adDraw(){
  const im=box.querySelector('img');if(im)im.onerror=()=>{ADS.splice(adI%ADS.length,1);adDraw()};
 }
 async function adLoad(){
- try{const r=await fetch('/api/banners');if(!r.ok)return;ADS=(await r.json()).banners||[];adI=0;adDraw();
-  clearInterval(adT);if(ADS.length>1)adT=setInterval(()=>{adI++;adDraw()},6000)}catch(e){}
+ try{const r=await fetch('/banners.json',{cache:'no-cache'});if(!r.ok)return;
+  const now=new Date();
+  ADS=((await r.json()).banners||[]).filter(b=>adLive(b,now)).sort((x,y)=>(x.sort||0)-(y.sort||0));
+  adI=0;adDraw();clearInterval(adT);if(ADS.length>1)adT=setInterval(()=>{adI++;adDraw()},6000)}catch(e){}
 }
 adLoad();
 

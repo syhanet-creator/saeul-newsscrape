@@ -36,19 +36,28 @@ python news_scrap.py
 - 요청 기간(`days`)은 1·3·7·14·30일 중 하나로 맞춰집니다(값을 바꿔 가며 서버 조회를 반복시키는 것을 막기 위함).
 - v1.0은 git 태그 `v1.0` 으로 보존되어 있습니다.
 
-## 관리자 모드 · 광고 배너 (`/admin`)
-화면 맨 위에 이미지+링크 광고 배너를 띄우고, 관리자가 `/admin` 에서 등록·수정·숨김·삭제합니다. 배너가 2개 이상이면 6초마다 돌아가며 보여 주고, 기간(시작·종료)과 순서를 정할 수 있습니다. 변경은 1분 안에 모든 방문자에게 반영됩니다.
+## 상단 광고 배너 (`public/banners.json`)
+화면 맨 위에 이미지+링크 광고 배너를 띄웁니다. 별도 서비스·비용 없이 이 파일 하나로 관리하며, 수정해서 올리면(GitHub main 푸시) Vercel 이 자동 배포합니다.
 
-**설정(처음 한 번)**
-1. Supabase 프로젝트를 만들고 SQL Editor 에서 `supabase/schema.sql` 을 실행합니다(표 + 이미지 보관함 생성).
-2. Vercel → Project Settings → Environment Variables 에 추가하고 Redeploy:
-   - `ADMIN_PASSWORD` : 관리자 비밀번호(길고 추측하기 어렵게)
-   - `SUPABASE_URL` : `https://<프로젝트>.supabase.co`
-   - `SUPABASE_SERVICE_ROLE_KEY` : Supabase → Project Settings → API Keys 의 service_role 키 (**서버 전용. 절대 공개 금지**)
-   - `ADMIN_SECRET` (선택) : 로그인 서명 키. 없으면 위 값에서 자동 생성
-3. `https://<주소>/admin` 에 접속해 로그인합니다. 설정이 빠졌으면 화면이 무엇이 빠졌는지 알려 줍니다.
-
-**보안**: 비밀번호 로그인 후 서명된 쿠키(HttpOnly·Secure·SameSite=Strict, 8시간)로만 관리 API 를 쓸 수 있고, 저장소 키는 서버에만 있습니다. 표는 행 단위 보안(RLS)이 켜져 있어 공개 키로는 접근할 수 없습니다. 링크는 http(s) 주소만 허용하고 `rel="noopener noreferrer sponsored"` 로 엽니다. `/admin` 은 검색엔진 색인과 서비스 워커 저장에서 제외됩니다.
+```json
+{
+  "banners": [
+    {
+      "image": "/banners/ad1.jpg",
+      "link": "https://example.com",
+      "caption": "겸직금지",
+      "active": true,
+      "start": "2026-10-20",
+      "end": "2026-11-20",
+      "sort": 1
+    }
+  ]
+}
+```
+- `image`: `public/banners/` 에 올린 파일(`/banners/파일명`) 또는 https 주소. 가로로 긴 이미지(가로 1200px 안팎) 권장
+- `link`: 누르면 이동할 http(s) 주소(없으면 이동 없음), `caption`: 이미지 아래 작은 문구(선택)
+- `active`: false 면 숨김, `start`/`end`: 노출 기간(날짜만 쓰면 한국 시간, 종료일은 그날 끝까지. 비우면 제한 없음)
+- `sort`: 작을수록 먼저. 노출 배너가 2개 이상이면 6초마다 돌아가며 표시, 0개면 아무것도 보이지 않음
 
 ## 기능
 - 출처: 구글 뉴스 RSS. 새울본부 탭은 울산 지역 신문 8곳(울산뉴스넷·울주신문·울산시민신문·울산신문·경상일보·울산제일일보·울산종합일보: 사이트 검색 결과 수집, 울산매일: 전체기사 RSS 최근 50건에서 키워드 필터)도 함께 수집

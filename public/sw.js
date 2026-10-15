@@ -6,7 +6,7 @@
  *  - 아이콘·매니페스트   : 저장본 우선, 뒤에서 갱신
  * 버전을 올리면(VERSION) 이전 저장본은 자동으로 지워진다.
  */
-const VERSION = 'v6';
+const VERSION = 'v5';
 const SHELL = 'shell-' + VERSION;
 const DATA = 'data-' + VERSION;
 const SHELL_FILES = ['/', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/maskable-512.png', '/icons/favicon-64.png'];
@@ -53,7 +53,6 @@ self.addEventListener('fetch', e => {
   const url = new URL(req.url);
   if (url.origin !== location.origin) return; // 외부 글꼴 등은 브라우저가 알아서
 
-  if (url.pathname === '/admin' || url.pathname === '/admin.html' || url.pathname === '/api/admin') return; // 관리자 화면은 서비스 워커가 건드리지 않는다
   if (url.pathname === '/api/author' || url.pathname === '/api/weather' || url.pathname === '/api/npp') return; // 저장하지 않고 그대로 네트워크로(날씨는 오래된 값이 의미 없다)
   if (url.pathname.startsWith('/api/')) {
     e.respondWith(networkFirst(req, DATA, null, MAX_DATA_ENTRIES));
