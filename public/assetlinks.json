@@ -1,0 +1,15 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.syhanet.khnpnews",
+      "sha256_cert_fingerprints": [
+        "20:53:9C:74:7E:3D:41:6D:E6:24:14:25:5D:17:7F:66:61:63:E0:F8:F1:C8:D8:4E:DC:12:1B:4D:C4:F6:A1:AD",
+        "FD:8F:91:1A:35:DB:5D:75:2C:06:A5:3A:1E:E7:CC:D3:FA:5C:4D:40:A3:F0:7A:CA:6E:2C:D9:DD:9F:44:F5:16"
+      ]
+    }
+  }
+]
