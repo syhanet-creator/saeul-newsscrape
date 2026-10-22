@@ -27,10 +27,10 @@ TABS_CFG = {
     "tabs": [
         # 전체: 모든 탭의 키워드를 한꺼번에 수집(키워드는 아래에서 채운다). 지역 신문은 새울본부 키워드에만 적용.
         {"id": "all", "name": "전체", "all": True, "local": True, "keywords": []},
-        {"id": "saeul", "title_has": ["새울"], "name": "새울본부", "main": True, "local": True,
-         "keywords": ["새울원자력본부", "새울본부"]},
         {"id": "khnp", "name": "한수원",
          "keywords": ["한국수력원자력주식회사", "한국수력원자력", "한수원", "한수원(주)"]},
+        {"id": "saeul", "title_has": ["새울"], "name": "새울본부", "main": True, "local": True,
+         "keywords": ["새울원자력본부", "새울본부"]},
         {"id": "hanul", "title_has": ["한울"], "name": "한울본부", "keywords": ["한울원자력본부", "한울본부"]},
         {"id": "kori", "title_has": ["고리"], "name": "고리본부", "keywords": ["고리원자력본부", "고리본부"]},
         {"id": "hanbit", "title_has": ["한빛"], "name": "한빛본부", "keywords": ["한빛원자력본부", "한빛본부"]},
