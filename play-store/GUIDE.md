@@ -1,4 +1,4 @@
-# Google Play 등록 가이드 (한수원 뉴스 스크랩)
+# Google Play 등록 가이드 (원전 뉴스 스크랩)
 
 앱 주소: https://saeul-newsscrape.vercel.app  (웹앱/PWA를 안드로이드 앱으로 감싸는 방식: TWA)
 
@@ -12,7 +12,7 @@
 2. 점수 화면에서 **Package For Stores** → **Android** → **Generate Package**(Google Play)
 3. 옵션:
    - Package ID: `com.syhanet.khnpnews`
-   - App name: `한수원 뉴스 스크랩` / Short name: `한수원뉴스`
+   - App name: `원전 뉴스 스크랩` / Short name: `원전뉴스`
    - App version: `1.0.0` / App version code: `1`
    - Display mode: Standalone, Notification delegation 등은 기본값
    - **Signing key: New** (PWABuilder가 키를 만들어 줌)
@@ -23,7 +23,7 @@
 5. 다음 버전을 올릴 때는 같은 키로, **버전 코드(version code)를 1씩 올려서** 다시 만듭니다.
 
 ## 2. Play Console에 올리기
-1. 앱 만들기: 앱 이름 `한수원 뉴스 스크랩`, 기본 언어 한국어, 앱, 무료
+1. 앱 만들기: 앱 이름 `원전 뉴스 스크랩`, 기본 언어 한국어, 앱, 무료
 2. 테스트 → **내부 테스트** → 새 버전 만들기 → `.aab` 업로드 (Play 앱 서명 사용에 동의)
 3. 설정 → **앱 무결성 → 앱 서명**에서 *앱 서명 키 인증서 SHA-256 지문* 복사
 

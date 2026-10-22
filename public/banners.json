@@ -1,11 +1,3 @@
 {
-  "banners": [
-    {
-      "image": "/banners/saeul-home.png",
-      "link": "https://www.khnp.co.kr/saeul/index.do",
-      "caption": "한수원(주) 새울본부 홈페이지",
-      "active": true,
-      "sort": 1
-    }
-  ]
+  "banners": []
 }
