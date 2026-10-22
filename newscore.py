@@ -26,10 +26,10 @@ TABS_CFG = {
     "ambiguous": ["미주지사", "유럽지사"],
     "tabs": [
         # 전체: 모든 탭의 키워드를 한꺼번에 수집(키워드는 아래에서 채운다). 지역 신문은 새울본부 키워드에만 적용.
-        {"id": "all", "name": "전체", "all": True, "local": True, "keywords": []},
+        {"id": "all", "name": "전체", "all": True, "main": True, "local": True, "keywords": []},
         {"id": "khnp", "name": "한수원",
          "keywords": ["한국수력원자력주식회사", "한국수력원자력", "한수원", "한수원(주)"]},
-        {"id": "saeul", "title_has": ["새울"], "name": "새울본부", "main": True, "local": True,
+        {"id": "saeul", "title_has": ["새울"], "name": "새울본부", "local": True,
          "keywords": ["새울원자력본부", "새울본부"]},
         {"id": "hanul", "title_has": ["한울"], "name": "한울본부", "keywords": ["한울원자력본부", "한울본부"]},
         {"id": "kori", "title_has": ["고리"], "name": "고리본부", "keywords": ["고리원자력본부", "고리본부"]},
@@ -749,7 +749,7 @@ def collect_tab(tab_id, days, fast=False):
     tab = TABS.get(tab_id)
     if not tab:
         return {"error": "알 수 없는 탭입니다."}
-    use_local = set(TABS[MAIN_TAB]["keywords"]) if tab.get("all") else bool(tab.get("local"))
+    use_local = set(TABS["saeul"]["keywords"]) if tab.get("all") else bool(tab.get("local"))   # 전체 탭: 지역 신문은 새울본부 키워드에만
     data = collect(days, tab["keywords"], fast=fast, use_local=use_local)
     data["tab"] = tab_id
     return data
