@@ -2,7 +2,7 @@
   "id": "/",
   "name": "원전 뉴스 스크랩",
   "short_name": "원전뉴스",
-  "description": "새울본부 중심, 원전본부·사업소별 뉴스 스크랩 (비공식)",
+  "description": "원전본부·사업소별 뉴스 스크랩 (비공식)",
   "lang": "ko",
   "dir": "ltr",
   "start_url": "/?source=pwa",
