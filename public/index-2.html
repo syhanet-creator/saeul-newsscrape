@@ -1,0 +1,610 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#06305f">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/png" href="/icons/favicon-64.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="원전뉴스">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>원전 뉴스 스크랩 2.1</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+:root{
+ --navy:#06305f;--blue:#0a5eb0;--sky:#1aa3e8;--teal:#0f9d94;
+ --bg:#eef3f9;--card:#fff;--tx:#14202e;--mut:#5b6b7d;--bd:#d9e3ee;
+ --ac:#0a5eb0;--ac-soft:#e6f1fc;--loc:#0f8a82;--loc-soft:#dff5f2;--star:#e8a100;--new:#e5484d;
+ --shadow:0 1px 2px rgba(6,48,95,.06),0 4px 14px rgba(6,48,95,.06);
+}
+@media(prefers-color-scheme:dark){:root{
+ --bg:#0b1520;--card:#12202f;--tx:#e6eef7;--mut:#93a4b8;--bd:#1f3347;
+ --ac:#5aa9f0;--ac-soft:#10304f;--loc:#4fd1c5;--loc-soft:#0f3a38;--star:#ffc233;--new:#ff7a7f;
+ --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 14px rgba(0,0,0,.25)}}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.55 Pretendard,"Malgun Gothic",system-ui,sans-serif;
+ padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right);padding-bottom:env(safe-area-inset-bottom)}
+button,.star,.tab,.chip,summary,label.ck{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+
+/* ---------- 헤더 ---------- */
+.hero{position:relative;overflow:hidden;color:#fff;background:linear-gradient(120deg,var(--navy) 0%,#0a4a8f 55%,#0f7fc4 100%);padding:26px 0 74px}
+.hero svg.atom{position:absolute;right:-70px;top:-60px;width:360px;height:360px;opacity:.16;pointer-events:none}
+.hero .in{max-width:920px;margin:0 auto;padding:0 16px;position:relative}
+.eyebrow{font-size:12px;letter-spacing:.14em;font-weight:700;color:#8fd3ff;display:flex;align-items:center;gap:8px}
+.eyebrow i{width:22px;height:2px;background:#8fd3ff;display:inline-block;border-radius:2px}
+h1{font-size:28px;line-height:1.2;margin:8px 0 6px;font-weight:800;letter-spacing:-.02em}
+.lead{color:#cfe6fb;font-size:14px;margin:0}
+.meta{color:#a9cdee;font-size:12.5px;margin-top:10px}
+
+.inst{margin-top:12px;border:1px solid rgba(255,255,255,.45);background:rgba(255,255,255,.14);color:#fff;border-radius:999px;padding:8px 16px;font:inherit;font-size:14px;font-weight:700;cursor:pointer;backdrop-filter:blur(4px)}
+.inst:hover{background:rgba(255,255,255,.24)}.inst[hidden]{display:none}
+.offline{display:inline-block;background:#fff6e0;color:#7a5200;border-radius:999px;padding:0 10px;font-size:12px;font-weight:700;margin-left:6px}
+@media(display-mode:standalone){.hero{padding-top:calc(26px + env(safe-area-inset-top))}}
+.wrap{max-width:920px;margin:-52px auto 0;padding:0 16px 56px;position:relative}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+.kpi{background:var(--card);border-radius:14px;padding:12px 14px;box-shadow:var(--shadow);border:1px solid var(--bd);position:relative;overflow:hidden}
+.kpi:before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--ac)}
+.kpi.k2:before{background:var(--sky)}.kpi.k3:before{background:var(--teal)}.kpi.k4:before{background:var(--new)}
+.kpi b{display:block;font-size:24px;line-height:1.1;font-weight:800;letter-spacing:-.02em}
+.kpi span{font-size:12px;color:var(--mut)}
+
+/* ---------- 카드·컨트롤 ---------- */
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+select,input[type=text],button.act{border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:10px;padding:8px 12px;font:inherit;font-size:14px}
+input[type=text]{flex:1;min-width:140px}input[type=text]:focus,select:focus{outline:2px solid var(--sky);outline-offset:0;border-color:transparent}
+button.act{cursor:pointer;font-weight:600}button.act:hover{border-color:var(--ac);color:var(--ac)}button.act:disabled{opacity:.5;cursor:default}
+button.act.primary{background:var(--ac);border-color:var(--ac);color:#fff}button.act.primary:hover{filter:brightness(1.1);color:#fff}
+label.ck{font-size:13px;color:var(--mut);display:flex;align-items:center;gap:6px;cursor:pointer}
+label.ck input{accent-color:var(--ac)}
+
+.tabsbar{position:sticky;top:0;z-index:5;background:var(--bg);padding:8px 0;margin-bottom:8px}
+.seg{display:flex;gap:4px;background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:4px;box-shadow:var(--shadow);width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}.seg::-webkit-scrollbar{display:none}
+.tab{flex:0 0 auto;border:0;background:none;color:var(--mut);border-radius:9px;padding:9px 14px;cursor:pointer;font:inherit;font-size:14px;font-weight:700;white-space:nowrap}
+.tab .n{font-weight:600;opacity:.75;margin-left:4px;font-size:12px}
+.tab.on{background:var(--ac);color:#fff;box-shadow:0 2px 8px rgba(10,94,176,.35)}
+.chip{border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:999px;padding:5px 13px;cursor:pointer;font:inherit;font-size:13px;font-weight:600}
+.chip:before{content:"#";color:var(--sky);margin-right:2px}
+.chip.on{background:var(--ac-soft);border-color:var(--ac);color:var(--ac)}
+
+.sum{background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:16px 18px;margin-bottom:16px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+.sum:before{content:"";position:absolute;left:0;right:0;top:0;height:4px;background:linear-gradient(90deg,var(--blue),var(--sky),var(--teal))}
+.sum h2{font-size:16px;margin:2px 0 10px;display:flex;justify-content:space-between;align-items:center;gap:8px;font-weight:800}
+.sum h2 .tt{display:flex;align-items:center;gap:8px}.sum h2 .tt:before{content:"✦";color:var(--sky)}
+.sum .body{font-size:14.5px;line-height:1.7}.sum ul{margin:8px 0 0;padding-left:20px}.sum li{margin:5px 0}.sum p{margin:0 0 6px}
+.sum details{margin-top:10px;font-size:13px}.sum summary{cursor:pointer;color:var(--mut)}
+.hist{border-top:1px solid var(--bd);margin-top:8px;padding-top:8px}
+.hb{display:flex;gap:6px}.mob{display:none}
+details.kw{margin-bottom:12px;font-size:13px}details.kw summary{cursor:pointer;color:var(--mut)}
+
+.item{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px 14px 12px 12px;margin-bottom:8px;display:flex;gap:8px;align-items:flex-start;position:relative;box-shadow:0 1px 2px rgba(6,48,95,.04);transition:box-shadow .15s,transform .15s}
+.item:hover{box-shadow:var(--shadow);transform:translateY(-1px)}
+.item.s{border-left:4px solid var(--ac)}.item.l{border-left:4px solid var(--teal)}
+.item .main{flex:1;min-width:0}
+.item a{color:var(--tx);text-decoration:none;font-weight:700;overflow-wrap:anywhere;word-break:keep-all;line-height:1.45}
+.item a:hover{color:var(--ac)}
+.sub{color:var(--mut);font-size:12.5px;margin-top:6px;display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;overflow-wrap:anywhere}
+.pill{display:inline-block;border-radius:999px;padding:1px 9px;font-size:12px;font-weight:700;background:var(--ac-soft);color:var(--ac)}
+.pill.loc{background:var(--loc-soft);color:var(--loc)}
+.by{font-weight:600;color:var(--tx);white-space:nowrap}
+.by.unk{font-weight:500;color:var(--mut);opacity:.85}
+.new{display:inline-block;font-size:10.5px;font-weight:800;color:#fff;background:var(--new);border-radius:6px;padding:0 6px;line-height:17px;letter-spacing:.04em}
+.tag{color:var(--sky);font-weight:600}
+.star{border:0;background:none;cursor:pointer;font-size:22px;line-height:1;color:#a9b6c6;padding:2px 4px}
+.star:hover{color:var(--star)}.star.on{color:var(--star)}
+.box{border:1px solid var(--ac);background:var(--ac-soft);border-radius:16px;padding:10px 10px 2px;margin-bottom:12px}
+.box>.hd{font-size:12.5px;color:var(--ac);font-weight:800;margin:2px 6px 8px;display:flex;align-items:center;gap:6px}
+.box>.hd:before{content:"⛓";font-size:13px}
+.box .item{background:var(--card)}
+.err{background:#fde8e8;color:#9b1c1c;padding:8px 12px;border-radius:10px;margin-bottom:10px;font-size:13px}
+@media(prefers-color-scheme:dark){.err{background:#3a1b1d;color:#ffb4b8}}
+.note{background:#fff6e0;color:#7a5200;border:1px solid #f1d28a;padding:8px 12px;border-radius:10px;margin-bottom:10px;font-size:13px}
+@media(prefers-color-scheme:dark){.note{background:#3a2e12;color:#ffd98a;border-color:#6b5217}}
+.empty{text-align:center;color:var(--mut);padding:48px 0}
+.foot{margin-top:28px;text-align:center;color:var(--mut);font-size:12px;line-height:1.7}
+.scroll{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.scroll::-webkit-scrollbar{display:none}.scroll>*{flex:0 0 auto}
+
+/* ---------- 터치 기기(태블릿 포함) ---------- */
+@media(pointer:coarse){
+ input[type=text],select,button.act{font-size:16px;min-height:44px}
+ .chip{min-height:40px;padding:8px 14px;font-size:14px}
+ .tab{padding:11px 14px}
+ label.ck{min-height:36px;gap:8px}label.ck input{width:20px;height:20px}
+ .star{min-width:40px;min-height:44px}
+ summary{min-height:36px;display:flex;align-items:center}
+}
+/* ---------- 모바일 ---------- */
+@media(max-width:640px){
+ .hero{padding:16px 0 52px}.hero svg.atom{width:260px;height:260px;right:-80px;top:-50px}
+ h1{font-size:22px;margin:6px 0 4px}.lead{font-size:13px}.meta{font-size:12px;margin-top:6px}
+ .wrap{padding:0 12px 48px;margin-top:-38px}
+ .kpis{grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px}.kpi{padding:8px 8px 8px 10px;border-radius:12px}.kpi b{font-size:19px}.kpi span{font-size:11px}
+ input[type=text],select,button.act{font-size:16px;min-height:44px;padding:8px 12px}
+ .bar{margin-bottom:8px}.bar>input[type=text]{flex:1 1 100%}.bar>select{flex:1 1 0}.bar>#re{flex:1 1 0}
+ #scrapbar{margin-left:0!important;width:100%;display:flex;gap:8px}#scrapbar button{flex:1 1 0}
+ .tab{padding:10px 12px;font-size:13.5px}
+ .chip{min-height:40px;padding:8px 14px;font-size:14px}
+ label.ck{font-size:14px;min-height:36px;gap:8px}label.ck input{width:20px;height:20px}
+ .item{padding:11px 8px 11px 8px;border-radius:12px}.item a{font-size:15px}
+ .star{min-width:40px;min-height:44px;font-size:24px;margin:-8px -4px -8px -6px}
+ .sub{font-size:12px}.box{padding:8px 6px 0;border-radius:14px}
+ .sum{padding:14px 14px}.sum h2{font-size:15px;flex-wrap:wrap}.sum .body{font-size:14px}
+ .sum summary,details.kw summary{min-height:36px;display:flex;align-items:center}
+ .tabsbar{margin-left:-12px;margin-right:-12px;padding-left:12px;padding-right:12px}
+ #chips{margin-left:-12px;margin-right:-12px;padding:0 12px 4px}
+ .mob{display:inline-block}
+ .sum.collapsed .body,.sum.collapsed label.ck,.sum.collapsed details{display:none}.sum.collapsed h2{margin:2px 0 0}
+}
+@media(hover:none){.item:hover{transform:none;box-shadow:none}.item a:hover{color:var(--tx)}}
+.tab.main:before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:currentColor;opacity:.7;margin-right:6px;vertical-align:middle}
+.ver{background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.4);border-radius:6px;padding:0 6px;margin-left:4px;letter-spacing:.04em}
+.seg,#chips{cursor:grab}.seg .tab,#chips .chip{cursor:inherit}
+.seg.dragging,#chips.dragging{cursor:grabbing;user-select:none;-webkit-user-select:none}
+.seg.dragging .tab,#chips.dragging .chip{pointer-events:none}
+.seg,#chips{touch-action:pan-y;overscroll-behavior-x:contain}
+@media(pointer:coarse){.seg,#chips{cursor:auto}}
+/* ---------- 상단 광고 배너 ---------- */
+.ad{position:relative;margin:60px 0 14px;border-radius:14px;overflow:hidden}   /* 투명 로고가 페이지 바탕 위에 바로 놓이도록 상자·그림자를 없애고, 위쪽 어두운 머리글 띠와 겹치지 않게 내린다 */
+@media(prefers-color-scheme:dark){.ad{background:#f4f8fc}}   /* 어두운 화면에서는 짙은 파란 글자가 안 보이므로 밝은 바탕을 깐다 */
+.ad[hidden]{display:none}
+.ad a,.ad .sl{display:block;color:inherit;text-decoration:none}
+.ad img{display:block;width:100%;height:auto;max-height:220px;object-fit:cover}
+.ad .dots{position:absolute;right:10px;top:10px;display:flex;gap:5px}.ad .dots i{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.55);box-shadow:0 0 0 1px rgba(0,0,0,.25)}.ad .dots i.on{background:#fff}
+/* ---------- 열린원전운영정보 실시간 패널 ---------- */
+.np{background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:14px 16px;margin-bottom:16px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+.np:before{content:"";position:absolute;left:0;right:0;top:0;height:4px;background:linear-gradient(90deg,var(--teal),var(--sky),var(--blue))}
+.nph{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:2px 0 10px}.nph b{font-size:15.5px;font-weight:800}
+.nph a{font-size:12.5px;color:var(--ac);text-decoration:none;white-space:nowrap;font-weight:700}
+.npk{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
+.npk div{background:var(--ac-soft);border-radius:10px;padding:8px 10px}.npk span{display:block;font-size:11.5px;color:var(--mut)}.npk b{font-size:17px;font-weight:800;letter-spacing:-.02em}.npk small{font-size:11.5px;font-weight:700;color:var(--mut);margin-left:3px}
+.npt{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin-bottom:10px}   /* 본부 버튼 5개를 옆으로 밀지 않아도 한 줄에 모두 보이게 균등 배치 */
+.npt button{border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:12px;padding:6px 0 5px;font:inherit;font-size:14px;font-weight:800;line-height:1.25;cursor:pointer;text-align:center;white-space:nowrap}
+.npt button small{display:block;color:var(--mut);font-weight:600;font-size:11.5px}.npt button.on{background:var(--ac);border-color:var(--ac);color:#fff}.npt button.on small{color:#dcebfa}
+.npu{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:6px}
+.npu div{border:1px solid var(--bd);border-radius:10px;padding:7px 9px;font-size:12px;color:var(--mut)}
+.npu div b{display:block;font-size:13.5px;color:var(--tx)}.npu div i{font-style:normal;font-weight:800;font-size:15px;color:var(--tx)}
+.npu div.run b:before{content:"●";color:#12a150;margin-right:4px}.npu div.stop b:before{content:"▲";color:#e39200;margin-right:4px}.npu div.stop{background:rgba(227,146,0,.08)}
+.npi{font-size:13px;margin:10px 0 6px}
+.npm{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--mut)}.npm b{color:var(--tx)}
+.npn{font-size:11.5px;color:var(--mut);margin-top:8px}
+@media(max-width:560px){.npk b{font-size:15px}}
+/* ---------- 사업소 날씨 ---------- */
+.wx{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin:0 0 12px;padding:2px 1px 4px}.wx::-webkit-scrollbar{display:none}
+.wx:empty{display:none}
+.wxc{flex:0 0 auto;min-width:118px;background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:9px 12px;box-shadow:var(--shadow)}
+.wxc .nm{font-size:12px;color:var(--mut);font-weight:700;white-space:nowrap}
+.wxc .tp{font-size:22px;font-weight:800;line-height:1.2;letter-spacing:-.02em}.wxc .tp small{font-size:12px;font-weight:600;color:var(--mut);margin-left:4px}
+.wxc .ds{font-size:12px;color:var(--mut);white-space:nowrap}
+.wxn{font-size:11.5px;color:var(--mut);margin:-6px 0 12px}
+</style></head><body>
+
+<header class="hero">
+ <svg class="atom" viewBox="0 0 400 400" fill="none" stroke="#fff" stroke-width="3" aria-hidden="true">
+  <ellipse cx="200" cy="200" rx="170" ry="62"/><ellipse cx="200" cy="200" rx="170" ry="62" transform="rotate(60 200 200)"/>
+  <ellipse cx="200" cy="200" rx="170" ry="62" transform="rotate(120 200 200)"/><circle cx="200" cy="200" r="18" fill="#fff"/>
+ </svg>
+ <div class="in">
+  <div class="eyebrow"><i></i>NEWS SCRAP · NPP <span class="ver">2.1</span></div>
+  <h1>원전 뉴스 스크랩</h1>
+  <p class="lead">원전본부·사업소별 보도를 탭으로 한눈에</p>
+  <div class="meta" id="meta">불러오는 중…</div>
+  <button class="inst" id="install" hidden>⬇ 앱으로 설치</button>
+ </div>
+</header>
+
+<div class="wrap">
+<div class="ad" id="ad" hidden></div>
+<section class="np" id="np" aria-label="열린원전운영정보 실시간 운영현황"><div class="nph"><b>⚛ 열린원전운영정보 · 실시간 운영현황</b><a href="https://npp.khnp.co.kr/" target="_blank" rel="noopener">원문 ↗</a></div><div id="npbody" class="npn">불러오는 중…</div></section>
+<div class="kpis">
+ <div class="kpi"><b id="k1">–</b><span>기사</span></div>
+ <div class="kpi k2"><b id="k2">–</b><span>오늘 신규</span></div>
+ <div class="kpi k3"><b id="k3">–</b><span>언론사</span></div>
+ <div class="kpi k4"><b id="k4">–</b><span>유사 묶음</span></div>
+</div>
+
+<div class="sum" id="sumcard"><h2><span class="tt" id="sumtt">AI 주간 브리핑 · 7일</span><span class="hb"><button class="act mob" id="sumtoggle">펼치기</button><button class="act primary" id="sumbtn">요약 생성</button></span></h2>
+<div class="body" id="sumbody">버튼을 누르면 이 탭의 최근 7일 기사를 AI가 요약합니다. (1시간 동안 모두에게 공유)</div>
+<label class="ck" style="margin-top:8px"><input type="checkbox" id="autosum"> 메인 탭은 매주 처음 열 때 자동 요약 (이 브라우저에 보관)</label>
+<details><summary>지난 요약 보기 (<span id="hn">0</span>)</summary><div id="hist"></div></details></div>
+
+<div class="tabsbar"><div class="seg" id="tabs" role="tablist" aria-label="원전본부·사업소 탭"></div></div>
+<div class="wx" id="wx" aria-label="사업소 현재 날씨"></div><div class="wxn" id="wxn"></div>
+<div class="bar scroll" id="chips"></div>
+<div class="bar"><input type="text" id="q" placeholder="결과 내 검색 (제목·언론사·기자)">
+<select id="days"><option value="1">최근 1일</option><option value="3">최근 3일</option><option value="7" selected>최근 7일</option><option value="30">최근 30일</option></select>
+<button class="act" id="re">새로고침</button></div>
+<div class="bar"><span id="scrapbar" style="display:none;margin-left:auto"><button class="act" id="csv">CSV 내보내기</button> <button class="act" id="cp">목록 복사</button> <button class="act" id="clr">스크랩 비우기</button></span></div>
+<div id="list"><div class="empty">불러오는 중…</div></div>
+<div class="foot">출처: 구글 뉴스(새울본부 탭은 울산 지역 신문 포함) · 기사 저작권은 각 언론사에 있으며 링크로 원문을 연결합니다.<br>기자 이름은 접속할 때마다 조금씩 채워집니다.<br>안드로이드 크롬: 메뉴(⋮) → <b>앱 설치</b> 또는 <b>홈 화면에 추가</b><br>개인용 모니터링 도구이며 한국수력원자력 공식 서비스가 아닙니다. · v2.1 (날씨)</div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const store={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}},
+ set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+
+/* ---------- 상태: 탭 구성(서버 /api/tabs), 탭별로 불러온 데이터 ---------- */
+let TABLIST=[],TABMAP={},MAIN='saeul',tab='saeul';
+const TD={};                 /* 탭 id -> 불러온 데이터 */
+const loading={};            /* 탭 id -> 불러오는 중인지 */
+let data=null,active=new Set(),cur=[],scraps=store.get('scraps',{});
+let loadSeq={},offline=false;
+
+function ago(ts){const m=Math.floor((Date.now()/1000-ts)/60);if(m<1)return'방금 전';if(m<60)return m+'분 전';
+ const h=Math.floor(m/60);if(h<24)return h+'시간 전';return Math.floor(h/24)+'일 전'}
+function fmt(ts){const d=new Date(ts*1000),p=n=>String(n).padStart(2,'0');
+ return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`}
+const tabName=id=>id==='scrap'?'스크랩':(TABMAP[id]?TABMAP[id].name:id);
+
+/* ---------- 목록 ---------- */
+/* 조회를 마쳤는데도 이름을 못 얻은 기사만 '기자 미확인'(조회 전·조회 중인 기사에는 표시하지 않는다) */
+const authUnknown=a=>!a.author&&(a.local||(a.link in authMap)||authFailed.has(a.link));
+function card(a,i){const on=!!scraps[a.link],fresh=Date.now()/1000-a.ts<6*3600;
+ return `<div class="item"><button class="star ${on?'on':''}" data-i="${i}" title="스크랩" aria-label="스크랩">${on?'★':'☆'}</button><div class="main">
+ <a href="${esc(a.link)}" target="_blank" rel="noopener">${esc(a.title)}</a>
+ <div class="sub"><span class="pill">${esc(a.source)}</span>${a.author?'<span class="by">✍ '+esc(a.author)+' 기자</span>':authUnknown(a)?'<span class="by unk">✍ 기자 미확인</span>':''}${fresh?'<span class="new">NEW</span>':''}<span>${fmt(a.ts)} · ${ago(a.ts)}</span>${a.kws&&a.kws.length?'<span class="tag">'+a.kws.map(k=>'#'+esc(k)).join(' ')+'</span>':''}</div></div></div>`}
+
+function tabs(){
+ const all=[...TABLIST.map(t=>({id:t.id,name:t.name,main:!!t.main})),{id:'scrap',name:'★ 스크랩'}];
+ $('tabs').innerHTML=all.map(t=>`<button class="tab ${tab===t.id?'on':''}${t.main?' main':''}" role="tab" aria-selected="${tab===t.id}" data-t="${t.id}">${esc(t.name)}<span class="n" id="n_${t.id}"></span></button>`).join('');
+ document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>switchTab(b.dataset.t));
+ setCounts();
+ const on=document.querySelector('.tab.on');if(on)on.scrollIntoView({inline:'center',block:'nearest'});
+}
+function setCounts(){
+ const c={scrap:Object.keys(scraps).length};
+ for(const id in TD)c[id]=TD[id].articles.filter(a=>!a.spam).length;
+ for(const k in c){const e=$('n_'+k);if(e)e.textContent=c[k]}}
+function kpis(arts,groups){
+ const t0=new Date();t0.setHours(0,0,0,0);
+ $('k1').textContent=arts.length;$('k2').textContent=arts.filter(a=>a.ts>=t0/1000).length;
+ $('k3').textContent=new Set(arts.map(a=>a.source)).size;$('k4').textContent=groups.filter(g=>g.length>1).length}
+function render(){
+ $('scrapbar').style.display=tab==='scrap'?'':'none';
+ const q=$('q').value.trim().toLowerCase();
+ setCounts();
+ if(tab==='scrap'){
+  cur=Object.values(scraps).sort((a,b)=>b.ts-a.ts).filter(a=>!q||(a.title+a.source+(a.author||'')).toLowerCase().includes(q));
+  $('meta').textContent=`스크랩 ${cur.length}건 · 이 브라우저에 저장됨`;
+  $('k1').textContent=cur.length;$('k2').textContent='–';$('k3').textContent=new Set(cur.map(a=>a.source)).size;$('k4').textContent='–';
+  $('list').innerHTML=cur.length?cur.map(card).join(''):'<div class="empty">☆를 눌러 기사를 스크랩하세요.</div>';return}
+ if(!data){$('list').innerHTML='<div class="empty">불러오는 중…</div>';return}
+ const ak=activeKws();
+ const arts=data.articles.filter(a=>!a.spam&&(!active.size||(a.kws||[]).some(k=>ak.has(k)))&&
+  (!q||(a.title+a.source+(a.author||'')).toLowerCase().includes(q)));
+ const gs=new Map();arts.forEach(a=>{if(!gs.has(a.gid))gs.set(a.gid,[]);gs.get(a.gid).push(a)});
+ const groups=[...gs.values()];
+ kpis(arts,groups);
+ cur=[];let html='';
+ for(const g of groups){
+  const body=g.map(a=>{cur.push(a);return card(a,cur.length-1)}).join('');
+  html+=g.length>1?`<div class="box"><div class="hd">유사 기사 ${g.length}건 · 언론사 ${new Set(g.map(x=>x.source)).size}곳</div>${body}</div>`:body}
+ $('meta').textContent=`${data.fetched} 기준 · ${tabName(tab)} ${arts.length}건`;
+ $('list').innerHTML=html||`<div class="empty">최근 ${$('days').value}일간 '${esc(tabName(tab))}' 관련 기사가 없습니다.<br>위의 기간을 늘려 보세요.</div>`;
+}
+$('list').onclick=e=>{const b=e.target.closest('.star');if(!b)return;const a=cur[+b.dataset.i];if(!a)return;
+ if(scraps[a.link])delete scraps[a.link];else scraps[a.link]={title:a.title,link:a.link,source:a.source,ts:a.ts,author:a.author||''};
+ store.set('scraps',scraps);setCounts();render()};
+/* 전체 탭: 칩은 '탭 이름'(눌러서 그 탭의 키워드에 걸린 기사만), 그 밖의 탭: 칩은 해시태그 키워드 */
+const isAll=()=>!!(TABMAP[tab]&&TABMAP[tab].all);
+function activeKws(){
+ if(!isAll())return active;
+ const s=new Set();active.forEach(id=>(TABMAP[id]?TABMAP[id].keywords:[]).forEach(k=>s.add(k)));return s}
+function chips(){
+ const t=TABMAP[tab];
+ $('chips').innerHTML=!t?'':isAll()
+  ?TABLIST.filter(x=>!x.all).map(x=>`<button class="chip ${active.has(x.id)?'on':''}" data-k="${esc(x.id)}">${esc(x.name)}</button>`).join('')
+  :t.keywords.map(k=>`<button class="chip ${active.has(k)?'on':''}" data-k="${esc(k)}">${esc(k)}</button>`).join('');
+ document.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{const k=b.dataset.k;active.has(k)?active.delete(k):active.add(k);chips();render()});
+}
+
+/* ---------- 탭 전환·불러오기 ---------- */
+function show(id){            /* id 탭의 데이터를 화면에 그린다(그 사이 다른 탭으로 옮겼다면 그리지 않는다) */
+ if(id!==tab)return;data=TD[id];applyAuthors();chips();render()}
+function switchTab(id){
+ if(id===tab)return;
+ tab=id;active=new Set();$('q').value='';npFollow(id);
+ try{history.replaceState(null,'','?tab='+id)}catch(e){}
+ tabs();$('sumcard').style.display=id==='scrap'?'none':'';wxDraw();wxLoad();
+ $('re').disabled=!!loading[id];
+ if(id==='scrap'){chips();render();return}
+ summaryShow();
+ if(TD[id]){show(id);fetchAuthors()}
+ else{data=null;chips();render();load()}
+}
+async function load(){
+ if(tab==='scrap'){render();return}
+ const id=tab,t=TABMAP[id];if(!t)return;
+ const my=loadSeq[id]=(loadSeq[id]||0)+1;
+ loading[id]=true;$('re').disabled=true;if(!TD[id])$('meta').textContent='불러오는 중…';
+ const base='/api/news?tab='+id+'&days='+$('days').value;
+ const jget=async u=>{const r=await fetch(u);if(r.headers.get('x-from-cache'))offline=true;return r.json()};
+ try{
+  offline=false;
+  /* 새울본부(지역 신문 포함) 탭은 구글 뉴스만 먼저 보여 주고 지역 신문을 합쳐 갱신한다 */
+  if(t.local){
+   const first=await jget(base+'&fast=1');
+   if(loadSeq[id]!==my)return;TD[id]=first;show(id);
+   if(id===tab)$('meta').textContent+=' · 지역 신문 불러오는 중…';
+  }
+  const full=await jget(base);
+  if(loadSeq[id]!==my)return;
+  if(full.error)throw new Error(full.error);
+  if(t.local){stashUpdate(full);stashMerge(full,+$('days').value)}
+  TD[id]=full;show(id);
+  if(t.local)retryLocal(id,0);
+  if(id===tab){if(offline)$('meta').innerHTML+='<span class="offline">오프라인 · 저장된 목록</span>';else fetchAuthors()}
+ }catch(e){if(loadSeq[id]===my&&id===tab)$('meta').textContent=(TD[id]?'일부만 불러왔습니다: ':'불러오기 실패: ')+e}
+ finally{if(loadSeq[id]===my){loading[id]=false;if(id===tab)$('re').disabled=false}}
+}
+
+/* ---------- 울산뉴스넷·울주신문: 서버가 그 사이트에 못 닿은 날에도 티 나지 않게 이어 보여 준다 ---------- */
+const LOCAL_SRC=['울산뉴스넷','울주신문'];
+const failedLocal=d=>(d.errors||[]).some(e=>LOCAL_SRC.some(s=>e.startsWith(s)));
+const localCount=d=>d.articles.filter(a=>LOCAL_SRC.includes(a.source)).length;
+function stashUpdate(d){                       /* 이번 응답의 두 신문 기사를 이 브라우저에 기억해 둔다(30일) */
+ const m=store.get('lstash',{}),now=Date.now()/1000;
+ d.articles.forEach(a=>{if(LOCAL_SRC.includes(a.source)&&!String(a.gid).startsWith('ls'))m[a.link]=a});
+ for(const k in m)if(now-m[k].ts>30*86400)delete m[k];
+ store.set('lstash',m)}
+function stashMerge(d,days){                   /* 서버가 못 닿았으면(오류) 기억해 둔 기사를 채워 넣는다 */
+ if(!failedLocal(d))return d;
+ const m=store.get('lstash',{}),have=new Set(d.articles.map(a=>a.link)),lim=Date.now()/1000-days*86400,ks=new Set(d.keywords||[]);
+ let n=0;for(const k in m){const a=m[k];if(!have.has(k)&&a.ts>=lim&&(a.kws||[]).some(x=>ks.has(x))){d.articles.push({...a,gid:'ls'+k});n++}}
+ if(n)d.articles.sort((a,b)=>b.ts-a.ts);return d}
+function retryLocal(id,tries){                 /* 오류가 나면 뒤에서 조용히 다시 요청한다(다른 서버에 닿으면 성공할 수 있다) */
+ const d=TD[id];if(!d||tries>=2||!failedLocal(d))return;
+ setTimeout(async()=>{
+  if(TD[id]!==d)return;
+  try{
+   const days=$('days').value,r=await (await fetch('/api/news?tab='+id+'&days='+days+'&r='+(tries+1)+'&_='+Date.now())).json();
+   if(r.error||TD[id]!==d)return;
+   stashUpdate(r);stashMerge(r,+days);
+   if(!failedLocal(r)||localCount(r)>localCount(d)){TD[id]=r;if(id===tab){show(id)}retryLocal(id,tries+1)}   /* 성공했거나 더 많이 얻었을 때만 바꾼다 */
+   else retryLocal(id,tries+1)
+  }catch(e){}
+ },tries===0?25000:60000)}
+
+/* ---------- 스크랩 내보내기 ---------- */
+function scrapList(){return Object.values(scraps).sort((a,b)=>b.ts-a.ts)}
+$('csv').onclick=()=>{const q=s=>'"'+String(s).replace(/"/g,'""')+'"';
+ const rows=[['날짜','언론사','기자','제목','링크'],...scrapList().map(a=>[fmt(a.ts),a.source,a.author||'',a.title,a.link])];
+ const blob=new Blob(['﻿'+rows.map(r=>r.map(q).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'});
+ const l=document.createElement('a');l.href=URL.createObjectURL(blob);l.download='news_scrap_'+new Date().toISOString().slice(0,10)+'.csv';l.click();URL.revokeObjectURL(l.href)};
+$('cp').onclick=async()=>{const t=scrapList().map(a=>`${a.title} (${a.source}${a.author?' '+a.author+' 기자':''}, ${fmt(a.ts)})\n${a.link}`).join('\n\n');
+ try{await navigator.clipboard.writeText(t);$('cp').textContent='복사됨 ✓'}catch(e){$('cp').textContent='복사 실패'}
+ setTimeout(()=>$('cp').textContent='목록 복사',1500)};
+$('clr').onclick=()=>{if(confirm('스크랩을 모두 지울까요?')){scraps={};store.set('scraps',scraps);setCounts();render()}};
+
+/* ---------- 주간 AI 요약 (탭마다 따로) ---------- */
+function md(t){const e=esc(t).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');let o='',ul=false;
+ for(const l of e.split(/\r?\n/)){if(/^\s*[-*] /.test(l)){if(!ul){o+='<ul>';ul=true}o+='<li>'+l.replace(/^\s*[-*] /,'')+'</li>'}
+ else{if(ul){o+='</ul>';ul=false}if(l.trim()&&!/^-{3,}$/.test(l.trim()))o+='<p>'+l+'</p>'}}return o+(ul?'</ul>':'')}
+function weekId(d=new Date()){const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));const n=t.getUTCDay()||7;
+ t.setUTCDate(t.getUTCDate()+4-n);const y=new Date(Date.UTC(t.getUTCFullYear(),0,1));return t.getUTCFullYear()+'-W'+Math.ceil(((t-y)/864e5+1)/7)}
+const sumTab=()=>tab==='scrap'?MAIN:tab;
+const histOf=id=>store.get('sumhist',[]).filter(x=>(x.tab||MAIN)===id);   /* v1 기록(tab 없음)은 메인 탭 것으로 본다 */
+function histRender(){const h=histOf(sumTab());$('hn').textContent=h.length;
+ $('hist').innerHTML=h.map(x=>`<div class="hist"><div class="sub">${esc(x.generated)} 생성 · ${esc(x.week)}</div><div class="body">${md(x.summary)}</div></div>`).join('')||'<div class="sub">아직 없습니다.</div>'}
+function summaryShow(){
+ const id=sumTab(),h=histOf(id);
+ $('sumtt').textContent=`AI 주간 브리핑 · ${tabName(id)} · 7일`;
+ if(h.length){$('sumbody').innerHTML=md(h[0].summary)+`<div class="sub">${esc(h[0].generated)} 생성 (저장된 요약)</div>`;$('sumbtn').textContent='다시 요약'}
+ else{$('sumbody').textContent='버튼을 누르면 이 탭의 최근 7일 기사를 AI가 요약합니다. (1시간 동안 모두에게 공유)';$('sumbtn').textContent='요약 생성'}
+ histRender()}
+async function summarize(auto){
+ const id=sumTab(),b=$('sumbtn');b.disabled=true;$('sumbody').textContent='AI가 요약하는 중… (최대 1분)';
+ try{
+  const resp=await fetch('/api/summary?tab='+id);let r;
+  try{r=await resp.json()}catch(e){r={error:resp.status===504?'요약 서버가 제한 시간 안에 끝내지 못했습니다. 잠시 후 다시 시도해 주세요.':'요약 서버 응답을 읽을 수 없습니다 (HTTP '+resp.status+')'}}
+  if(r.error){store.set('sumfailAt',Date.now());if(id===sumTab())$('sumbody').innerHTML=`<div class="err">${esc(r.error)}</div>`}
+  else if(r.fallback){   /* AI 를 못 쓸 때: 보도 건수가 많은 이슈 목록(저장하지 않음) */
+   store.set('sumfailAt',Date.now());
+   if(id===sumTab()){$('sumbody').innerHTML=`<div class="sub">${esc(r.note)}</div>`+md(r.summary)+`<div class="sub">${r.generated} 기준 · 기사 ${r.count}건 → ${r.groups}개 묶음</div>`;b.textContent='다시 요약'}}
+  else{
+   const h=store.get('sumhist',[]).filter(x=>!((x.tab||MAIN)===id&&x.week===weekId()&&x.generated===r.generated));
+   h.unshift({tab:id,week:weekId(),generated:r.generated,summary:r.summary});store.set('sumhist',h.slice(0,40));
+   if(id===MAIN)store.set('sumweek',weekId());
+   if(id===sumTab()){$('sumbody').innerHTML=md(r.summary)+`<div class="sub">${r.generated} 생성 · 기사 ${r.count}건 → ${r.groups}개 묶음 기준</div>`;b.textContent='다시 요약';histRender()}}
+ }catch(e){store.set('sumfailAt',Date.now());if(id===sumTab())$('sumbody').textContent='요약 실패: 서버에 연결하지 못했습니다. 네트워크를 확인해 주세요. ('+e+')'}
+ b.disabled=false}
+$('sumbtn').onclick=()=>summarize(false);
+{const box=$('sumcard'),tg=$('sumtoggle');
+ const sync=()=>tg.textContent=box.classList.contains('collapsed')?'펼치기':'접기';
+ if(innerWidth<=640&&!store.get('sumopen',false))box.classList.add('collapsed');sync();
+ tg.onclick=()=>{box.classList.toggle('collapsed');store.set('sumopen',!box.classList.contains('collapsed'));sync()};
+ const _s=summarize;summarize=async function(a){if(innerWidth<=640&&!a){box.classList.remove('collapsed');sync()}return _s(a)}}
+$('autosum').checked=store.get('autosum',true);
+$('autosum').onchange=()=>store.set('autosum',$('autosum').checked);
+
+$('re').onclick=load;
+$('days').onchange=()=>{for(const k in TD)delete TD[k];load()};   /* 기간이 바뀌면 불러온 탭들을 모두 새로 받는다 */
+$('q').oninput=render;
+
+/* ---------- 기자 이름: 한 건씩 천천히 채운다 ---------- */
+const GN='https://news.google.com/rss/articles/';
+let authMap=store.get('auth5',{}),authBusy=false,authPausedUntil=0;const authFailed=new Set();
+const sameAsOutlet=(a,n)=>!n||a.source.replace(/\s/g,'').includes(n)||n.includes(a.source.replace(/\s/g,''));
+function applyAuthors(){if(!data)return;data.articles.forEach(a=>{if(a.author&&sameAsOutlet(a,a.author))a.author='';if(!a.author&&authMap[a.link]&&!sameAsOutlet(a,authMap[a.link]))a.author=authMap[a.link]})}
+async function fetchAuthors(){
+ if(authBusy||!data||Date.now()<authPausedUntil)return;authBusy=true;let changed=0,n=0,slow=0;const mine=data;
+ try{
+  const todo=mine.articles.filter(a=>!a.local&&!a.spam&&!a.author&&a.link.startsWith(GN)&&!(a.link in authMap)&&!authFailed.has(a.link));
+  for(const a of todo){
+   /* 서버에 이미 저장돼 즉시 오는 결과는 제한 없이, 서버가 새로 알아봐야 하는(느린) 조회만 한 번에 25건까지 */
+   if(slow>=25||data!==mine)break;n++;const t0=Date.now();let r;
+   let resp;
+   try{resp=await fetch('/api/author?v=5&u='+encodeURIComponent(a.link)+'&t='+encodeURIComponent(a.title)+'&d='+encodeURIComponent(a.domain||''));r=await resp.json()}catch(e){break}
+   /* 서버가 외부(빙·구글)에 실제로 물어본 조회만 '느린 조회'로 센다(저장분·서버 기억은 제한 없음) */
+   const costly=resp.headers.get('x-vercel-cache')!=='HIT'&&r.via!=='mem';if(costly)slow++;
+   if(r.status==='blocked'){authPausedUntil=Date.now()+180000;break}   /* 구글이 막으면 3분 쉰다 */
+   if(r.status!=='ok'){authFailed.add(a.link);await new Promise(res=>setTimeout(res,costly?800:100));continue}
+   authMap[a.link]=r.author||'';
+   if(r.author&&!sameAsOutlet(a,r.author)){mine.articles.forEach(x=>{if(x.link===a.link)x.author=r.author});if(++changed%4===0&&data===mine)render()}
+   await new Promise(res=>setTimeout(res,costly?1500:100));   /* 저장분에서 온 건 빠르게, 서버가 새로 물어본 건 천천히 */
+  }
+ }finally{
+  authBusy=false;if(n>0&&tab!=='scrap'&&data===mine)render();  /* 조회를 마친 기사에 '기자 미확인'이 반영되도록 */
+  const ks=Object.keys(authMap);if(ks.length>3000)authMap=Object.fromEntries(ks.slice(-2000).map(k=>[k,authMap[k]]));
+  store.set('auth5',authMap)}
+}
+
+/* ---------- 탭 바·칩 바를 손 모양으로 끌어서(마우스) 또는 손가락으로 밀어서(터치) 좌우로 움직이기. 휠로는 움직이지 않는다 ---------- */
+function dragScroll(el){
+ /* 마우스·터치로 끌어서 좌우로 움직인다. 마우스 휠은 탭을 움직이지 못하고 페이지를 위아래로만 움직인다. */
+ let down=false,moved=false,sx=0,sl=0,lx=0,lt=0,v=0,raf=0,pid=null;
+ el.addEventListener('pointerdown',e=>{
+  if(e.pointerType==='mouse'&&e.button!==0)return;
+  cancelAnimationFrame(raf);down=true;moved=false;pid=e.pointerId;sx=lx=e.clientX;sl=el.scrollLeft;lt=e.timeStamp;v=0});
+ addEventListener('pointermove',e=>{
+  if(!down||e.pointerId!==pid)return;
+  const dx=e.clientX-sx;
+  if(!moved&&Math.abs(dx)>4){moved=true;el.classList.add('dragging')}
+  if(!moved)return;
+  el.scrollLeft=sl-dx;
+  const dt=e.timeStamp-lt;if(dt>0)v=(lx-e.clientX)/dt;      /* px/ms: 손을 뗄 때의 속도(관성에 쓴다) */
+  lx=e.clientX;lt=e.timeStamp});
+ const end=e=>{
+  if(!down||(e&&e.pointerId!==pid))return;
+  down=false;el.classList.remove('dragging');
+  if(moved&&e&&e.pointerType==='touch'&&Math.abs(v)>0.05){   /* 터치: 손을 떼도 속도만큼 미끄러지다 멈춘다 */
+   let vel=v*16;const step=()=>{el.scrollLeft+=vel;vel*=0.94;if(Math.abs(vel)>0.4)raf=requestAnimationFrame(step)};
+   raf=requestAnimationFrame(step)}};
+ addEventListener('pointerup',end);addEventListener('pointercancel',end);
+ /* 끌고 나서 손을 뗄 때 탭이 눌리지 않게 한다 */
+ el.addEventListener('click',e=>{if(moved){e.stopPropagation();e.preventDefault();moved=false}},true);
+ /* 휠로 탭이 좌우로 움직이는 것을 막는다: 가로 휠·트랙패드 가로 밀기·Shift+휠은 무시하고, 세로 성분만 페이지 스크롤로 보낸다.
+    (세로 휠만 오는 일반 휠은 건드리지 않으므로 페이지가 위아래로 그대로 스크롤된다.) */
+ el.addEventListener('wheel',e=>{
+  if(e.deltaX!==0||e.shiftKey){e.preventDefault();if(e.deltaY&&!e.shiftKey)window.scrollBy(0,e.deltaY)}},{passive:false});
+}
+dragScroll($('tabs'));dragScroll($('chips'));
+
+
+/* ---------- 사업소 날씨 (/api/weather, 10분마다 갱신) ---------- */
+const WX={};
+const nz=v=>v==null?'–':Math.round(v*10)/10;
+function wxDraw(){
+ const w=WX[tab];
+ if(tab==='scrap'||!w||!w.sites||!w.sites.length){$('wx').innerHTML='';$('wxn').textContent='';return}
+ $('wx').innerHTML=w.sites.map(s=>`<div class="wxc"><div class="nm">${esc(s.name)}</div><div class="tp">${s.icon} ${nz(s.temp)}°<small>${esc(s.text)}</small></div><div class="ds">체감 ${nz(s.feels)}° · 습도 ${nz(s.humidity)}%</div><div class="ds">바람 ${nz(s.wind)}m/s · 강수 ${nz(s.rain)}mm</div></div>`).join('');
+ $('wxn').textContent='현재 날씨 · Open-Meteo 기준(시설 소재지 대략 위치)'+(w.fetchedAt?' · '+new Date(w.fetchedAt).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})+' 갱신':'');
+}
+const WMO={0:['☀️','맑음'],1:['🌤️','대체로 맑음'],2:['⛅','구름 조금'],3:['☁️','흐림'],45:['🌫️','안개'],48:['🌫️','안개'],51:['🌦️','이슬비'],53:['🌦️','이슬비'],55:['🌦️','이슬비'],
+ 56:['🌧️','어는 비'],57:['🌧️','어는 비'],61:['🌧️','비'],63:['🌧️','비'],65:['🌧️','강한 비'],66:['🌧️','어는 비'],67:['🌧️','어는 비'],71:['🌨️','눈'],73:['🌨️','눈'],75:['❄️','강한 눈'],
+ 77:['🌨️','싸락눈'],80:['🌦️','소나기'],81:['🌦️','소나기'],82:['⛈️','강한 소나기'],85:['🌨️','눈 소나기'],86:['🌨️','눈 소나기'],95:['⛈️','뇌우'],96:['⛈️','뇌우·우박'],99:['⛈️','뇌우·우박']};
+let WXS={};   /* 탭 id -> [{name,lat,lon}] (서버가 /api/tabs 로 내려 줌) */
+/* 서버(/api/weather)가 안 될 때: 브라우저가 Open-Meteo 를 직접 부른다(CORS 허용). */
+async function wxDirect(id){
+ const sites=WXS[id]||[];if(!sites.length)return {tab:id,sites:[]};
+ const q=new URLSearchParams({latitude:sites.map(s=>s.lat).join(','),longitude:sites.map(s=>s.lon).join(','),
+  current:'temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,weather_code,wind_speed_10m',wind_speed_unit:'ms',timezone:'auto'});
+ const r=await fetch('https://api.open-meteo.com/v1/forecast?'+q);if(!r.ok)throw new Error('Open-Meteo '+r.status);
+ const j=await r.json(),arr=Array.isArray(j)?j:[j];
+ return {tab:id,sites:sites.map((s,i)=>{const c=(arr[i]||{}).current||{},w=WMO[c.weather_code]||['🌡️','–'];
+  return {name:s.name,icon:w[0],text:w[1],temp:c.temperature_2m,feels:c.apparent_temperature,humidity:c.relative_humidity_2m,rain:c.precipitation,wind:c.wind_speed_10m}})};
+}
+async function wxLoad(){
+ const id=tab;if(id==='scrap'){wxDraw();return}
+ const fresh=WX[id]&&Date.now()-WX[id].fetchedAt<9*60e3;
+ if(fresh){wxDraw();return}
+ let r=null,why='';
+ try{const x=await fetch('/api/weather?tab='+id);if(!x.ok)throw new Error('서버 '+x.status);r=await x.json();if(r.error||!r.sites)throw new Error(r.error||'응답 형식 오류')}
+ catch(e){why=e.message;r=null;
+  try{r=await wxDirect(id)}catch(e2){why+=' / '+e2.message;r=null}}
+ if(r){r.fetchedAt=Date.now();WX[id]=r}
+ if(id!==tab)return;
+ if(!r&&!WX[id]&&(WXS[id]||[]).length){$('wx').innerHTML='';$('wxn').textContent='⚠ 날씨를 불러오지 못했습니다 ('+why+')';return}
+ wxDraw();
+}
+setInterval(()=>{if(document.visibilityState==='visible')wxLoad()},10*60e3);
+addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')wxLoad()});
+
+
+/* ---------- 열린원전운영정보 실시간 패널 (/api/npp, 5분마다 갱신) ---------- */
+let NP=null,npSel=store.get('npSel','새울');
+const NPORD=['새울','고리','월성','한울','한빛'];
+const NPTAB={saeul:'새울',hanul:'한울',kori:'고리',hanbit:'한빛',wolsong:'월성'};   /* 원전본부 기사 탭을 고르면 운영정보도 그 본부로 */
+function npFollow(id){const n=NPTAB[id];if(n&&n!==npSel){npSel=n;npDraw()}}   /* 직접 고른 선택은 저장하지만, 탭을 따라 바뀐 것은 저장하지 않는다 */
+const npf=(v,d)=>v==null?'–':Number(v).toLocaleString('ko-KR',{maximumFractionDigits:d==null?0:d});
+function npDraw(){
+ const box=$('npbody');
+ if(!NP){return}
+ if(NP.error){box.className='npn';box.innerHTML='⚠ '+esc(NP.error)+' · <a href="https://npp.khnp.co.kr/" target="_blank" rel="noopener">원문 열기</a>';return}
+ const sm=NP.summary||{},br=NP.branches||{};
+ if(!br[npSel])npSel=NPORD.find(n=>br[n])||Object.keys(br)[0];
+ const b=br[npSel]||{units:[]};
+ const run=u=>u.state==='운영중';
+ const tabs=NPORD.filter(n=>br[n]).map(n=>{const us=br[n].units||[];return `<button data-b="${esc(n)}" class="${n===npSel?'on':''}">${esc(n)}<small>${us.filter(run).length}/${us.length}</small></button>`}).join('');
+ const units=(b.units||[]).map(u=>run(u)
+  ?`<div class="run"><b>${esc(u.name)}</b><i>${npf(u.reactor_pct,1)}%</i><br>${npf(u.gen_mwe)} MWe</div>`
+  :`<div class="stop"><b>${esc(u.name)}</b>정비중</div>`).join('');
+ const r=b.radiation,w=b.weather;
+ const meta=[r?`방사선량 <b>${esc(r.status)} (${npf(r.max,3)} μSv/h)</b>`:'',
+  w&&w.temp!=null?`기온 <b>${npf(w.temp,1)}℃</b> · 습도 <b>${npf(w.humidity,1)}%</b> · 풍속 <b>${npf(w.wind,1)}m/s</b> · 강수 <b>${npf(w.rain,1)}mm</b>`:'',
+  w&&w.time?`측정 ${esc(w.time)}`:''].filter(Boolean).map(x=>`<span>${x}</span>`).join('');
+ box.className='';
+ box.innerHTML=`<div class="npk"><div><span>원자력 설비용량</span><b>${esc(sm.capacity||'–')}</b></div><div><span>원자력 발전량</span><b>${esc(sm.generation||'–')}</b></div><div><span>운전중 기수</span><b>${sm.running!=null?sm.running:'–'}<small>/ ${sm.total!=null?sm.total:'–'}기</small></b></div></div>
+ <div class="npt" id="npt">${tabs}</div><div class="npu">${units}</div>${b.info?`<div class="npi">${esc(b.info)}</div>`:''}<div class="npm">${meta}</div>
+ <div class="npn">출처: 한국수력원자력 열린원전운영정보(npp.khnp.co.kr) · ${esc(NP.fetched||'')} 조회${NP.errors&&NP.errors.length?' · 일부 항목 불러오기 실패':''}</div>`;
+ document.querySelectorAll('#npt button').forEach(x=>x.onclick=()=>{npSel=x.dataset.b;store.set('npSel',npSel);npDraw()});
+ const t=$('npt'),on=t&&t.querySelector('button.on');   /* 선택한 본부 버튼이 옆으로 밀려 안 보이면 이 줄만 가로로 밀어 가운데에 오게(페이지는 움직이지 않음) */
+ if(on)t.scrollLeft=on.offsetLeft-(t.clientWidth-on.offsetWidth)/2;
+}
+async function npLoad(){
+ try{const r=await fetch('/api/npp');if(!r.ok)throw new Error('서버 '+r.status);NP=await r.json()}
+ catch(e){if(!NP)NP={error:'운영정보를 불러오지 못했습니다 ('+e.message+')'}}
+ npDraw();
+}
+npLoad();
+setInterval(()=>{if(document.visibilityState==='visible')npLoad()},5*60e3);
+
+
+/* ---------- 상단 광고 배너 (public/banners.json 으로 관리) ---------- */
+let ADS=[],adI=0,adT=null;
+const KST=(d,end)=>d?new Date(/T/.test(d)?d:d+(end?'T23:59:59+09:00':'T00:00:00+09:00')):null;   /* 날짜만 쓰면 한국 시간 기준(종료일은 그날 끝까지) */
+function adLive(b,now){
+ if(!b||b.active===false||!b.image)return false;
+ if(!/^(\/(?!\/)|https:\/\/)/.test(b.image))return false;       /* 이미지는 이 사이트의 /경로 또는 https 주소만 */
+ const s=KST(b.start),e=KST(b.end,true);
+ return !(s&&now<s)&&!(e&&now>e)}
+function adDraw(){
+ const box=$('ad');
+ if(!ADS.length){box.hidden=true;return}
+ const a=ADS[adI%ADS.length];
+ const ok=/^https?:\/\//i.test(a.link||'');
+ const img=`<img src="${esc(a.image)}" alt="${esc(a.caption||'배너')}" loading="lazy">`;
+ box.hidden=false;
+ box.innerHTML=`${ADS.length>1?'<span class="dots">'+ADS.map((_,i)=>`<i class="${i===adI%ADS.length?'on':''}"></i>`).join('')+'</span>':''}`+
+  (ok?`<a href="${esc(a.link)}" target="_blank" rel="noopener noreferrer">${img}</a>`:`<div class="sl">${img}</div>`);
+ const im=box.querySelector('img');if(im)im.onerror=()=>{ADS.splice(adI%ADS.length,1);adDraw()};
+}
+async function adLoad(){
+ try{const r=await fetch('/banners.json',{cache:'no-cache'});if(!r.ok)return;
+  const now=new Date();
+  ADS=((await r.json()).banners||[]).filter(b=>adLive(b,now)).sort((x,y)=>(x.sort||0)-(y.sort||0));
+  adI=0;adDraw();clearInterval(adT);if(ADS.length>1)adT=setInterval(()=>{adI++;adDraw()},6000)}catch(e){}
+}
+adLoad();
+
+/* ---------- PWA: 서비스 워커·설치 버튼 ---------- */
+if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));
+let installEv=null;
+addEventListener('beforeinstallprompt',e=>{e.preventDefault();installEv=e;$('install').hidden=false});
+$('install').onclick=async()=>{if(!installEv)return;installEv.prompt();await installEv.userChoice;installEv=null;$('install').hidden=true};
+addEventListener('appinstalled',()=>{$('install').hidden=true});
+addEventListener('online',()=>{if(document.visibilityState==='visible')load()});
+
+/* ---------- 시작: 탭 구성을 받아 메인(새울본부) 탭부터 보여 준다 ---------- */
+(async()=>{
+ let cfg;
+ try{cfg=await (await fetch('/api/tabs')).json()}catch(e){$('meta').textContent='탭 정보를 불러오지 못했습니다. 새로고침해 보세요.';$('list').innerHTML='';return}
+ TABLIST=cfg.tabs;WXS=cfg.weather_sites||{};TABMAP=Object.fromEntries(TABLIST.map(t=>[t.id,t]));MAIN=(TABLIST.find(t=>t.main)||TABLIST[0]).id;
+ const q=new URLSearchParams(location.search).get('tab');tab=(TABMAP[q]||q==='scrap')?q:MAIN;npFollow(tab);
+ tabs();$('sumcard').style.display=tab==='scrap'?'none':'';summaryShow();wxLoad();
+ if(tab==='scrap'){chips();render()}else{chips();await load()}
+ if(tab===MAIN&&$('autosum').checked&&store.get('sumweek','')!==weekId()&&Date.now()-store.get('sumfailAt',0)>3600e3)summarize(true);   /* 직전에 실패했다면 1시간 동안은 자동으로 다시 시도하지 않는다 */
+})();
+</script></body></html>
