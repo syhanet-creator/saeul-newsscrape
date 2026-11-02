@@ -37,6 +37,8 @@ def respond(h, fn, ttl=0):
     result = fn(days, kws, fast, tab)
     if isinstance(result, dict) and result.get("errors"):
         ttl = min(ttl, 10)  # 일부 출처가 실패한 응답은 오래 공유하지 않는다
+    if isinstance(result, dict) and result.get("fallback"):
+        ttl = min(ttl, 60)  # AI 없이 만든 대체 요약도 오래 공유하지 않는다
     cacheable = ttl > 0 and not (isinstance(result, dict) and result.get("error"))
     send_json(h, result, f"public, s-maxage={ttl}, stale-while-revalidate={ttl * 4}" if cacheable else "no-store")
 
