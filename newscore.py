@@ -817,8 +817,8 @@ def _post_json(url, headers, payload, timeout=50):
 
 def _friendly(code, detail):
     d = detail.lower()
-    if "credit balance" in d:
-        return "API 크레딧이 부족합니다. 공급자 콘솔에서 충전해 주세요."
+    if "credit balance" in d or code == 402 or "prepayment" in d or "credits are depleted" in d:
+        return "AI 요약 이용 한도(충전금)가 소진되었습니다. 관리자가 API 키·크레딧을 확인해야 합니다."
     if code in (401, 403) or "api key" in d and ("invalid" in d or "not valid" in d):
         return "API 키가 올바르지 않습니다. 환경변수를 확인해 주세요."
     if code == 429 or "quota" in d or "rate" in d:
@@ -826,35 +826,66 @@ def _friendly(code, detail):
     return f"HTTP {code}: {detail[:200]}"
 
 
-def _ask_llm(prompt):
-    """GEMINI_API_KEY 가 있으면 Gemini, 없으면 ANTHROPIC_API_KEY 로 Claude 호출."""
+def _ask_llm(prompt, deadline=None):
+    """GEMINI_API_KEY 가 있으면 Gemini, 없으면 ANTHROPIC_API_KEY 로 Claude 호출. deadline(epoch 초) 이후로는 시도하지 않는다."""
     gkey = os.environ.get("GEMINI_API_KEY")
     if gkey:
         last = None
         # 과부하(503)·모델 없음(404)·한도(429)면 다음 모델로 넘어간다.
         for model in (GEMINI_MODEL, "gemini-flash-latest", "gemini-flash-lite-latest"):
+            left = 18 if deadline is None else min(18, deadline - time.time())
+            if left < 4:   # 남은 시간이 부족하면 더 시도하지 않는다(함수 제한 시간 초과 방지)
+                break
             try:
                 r = _post_json(
                     f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
                     {"x-goog-api-key": gkey},
-                    {"contents": [{"parts": [{"text": prompt}]}]}, timeout=18)
+                    {"contents": [{"parts": [{"text": prompt}]}]}, timeout=left)
                 return r["candidates"][0]["content"]["parts"][0]["text"]
             except ApiError as e:
                 last = e
                 if e.code not in (404, 429, 500, 503):
                     raise
-            except TimeoutError as e:
+            except (TimeoutError, urllib.error.URLError) as e:
                 last = e
-        raise last
+        raise last or ApiError(504, "AI 응답 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요.")
     akey = os.environ.get("ANTHROPIC_API_KEY")
     if akey:
         r = _post_json(
             "https://api.anthropic.com/v1/messages",
             {"x-api-key": akey, "anthropic-version": "2023-06-01"},
             {"model": CLAUDE_MODEL, "max_tokens": 1200,
-             "messages": [{"role": "user", "content": prompt}]})
+             "messages": [{"role": "user", "content": prompt}]},
+            timeout=50 if deadline is None else max(5, min(50, deadline - time.time())))
         return r["content"][0]["text"]
     raise RuntimeError("GEMINI_API_KEY 또는 ANTHROPIC_API_KEY 환경변수가 설정되지 않았습니다.")
+
+
+def _collect_for_summary(tab_id, days, budget=18):
+    """요약용 기사 수집: 빠른 구글 뉴스를 먼저 받고, 느린 지역 신문은 budget 초만 기다린다."""
+    data = collect_tab(tab_id, days, fast=True)
+    tab = TABS[tab_id]
+    if data.get("error") or not (tab.get("all") or tab.get("local")):
+        return data
+    ex = ThreadPoolExecutor(1)
+    fut = ex.submit(collect_tab, tab_id, days)
+    try:
+        full = fut.result(timeout=budget)
+        if not full.get("error"):
+            data = full
+    except Exception:
+        pass   # 지역 신문이 느리면 구글 뉴스만으로 요약한다
+    finally:
+        ex.shutdown(wait=False)
+    return data
+
+
+def _fallback_summary(days, name, groups, ordered):
+    cnt = sum(map(len, groups.values()))
+    head = f"최근 {days}일간 '{name}' 관련 기사 {cnt}건(비슷한 기사 묶음 {len(groups)}개)입니다. 보도 건수가 많은 이슈는 다음과 같습니다."
+    items = [f"- **{g[0]['title'].replace('*', '')}**: {len(g)}건 보도 ({', '.join(sorted({x['source'] for x in g})[:3])})"
+             for g in ordered[:6]]
+    return head + "\n\n" + "\n".join(items)
 
 
 def weekly_summary(days=7, tab_id=None):
@@ -866,7 +897,8 @@ def weekly_summary(days=7, tab_id=None):
     hit = _cache.get(ck)
     if hit and time.time() - hit[0] < 1800:
         return hit[1]
-    data = collect_tab(tab_id, days)
+    t0 = time.time()
+    data = _collect_for_summary(tab_id, days)
     if data.get("error"):
         return data
     groups = {}
@@ -887,9 +919,15 @@ def weekly_summary(days=7, tab_id=None):
               "건수가 많은 순으로 주요 이슈 3~6개를 '- **이슈명**: 한두 문장 설명' 형태의 목록으로. "
               "목록에 없는 내용은 추측하지 마세요.\n\n" + "\n".join(lines))
     try:
-        text = _ask_llm(prompt)
+        text = _ask_llm(prompt, deadline=t0 + 50)   # 서버 함수 제한(60초) 안에 끝내서 항상 정상 응답을 준다
     except Exception as e:
-        return {"error": f"AI 요약 호출 실패: {e}"}
+        # AI 를 못 쓸 때: 오류만 보이지 않게, 보도 건수가 많은 이슈를 그대로 보여 준다(저장·장기 공유하지 않음)
+        out = {"summary": _fallback_summary(days, name, groups, ordered), "fallback": True,
+               "note": f"AI 요약을 쓸 수 없어 보도 건수가 많은 이슈를 대신 보여 드립니다. ({e})",
+               "count": sum(map(len, groups.values())), "groups": len(groups),
+               "generated": datetime.now(KST).strftime("%Y-%m-%d %H:%M"), "tab": tab_id}
+        _cache[ck] = (time.time() - 1680, out)   # 2분만 기억해 같은 실패를 반복해서 기다리지 않게 한다
+        return out
     out = {"summary": text, "count": sum(map(len, groups.values())), "groups": len(groups),
            "generated": datetime.now(KST).strftime("%Y-%m-%d %H:%M"), "tab": tab_id}
     _cache[ck] = (time.time(), out)
